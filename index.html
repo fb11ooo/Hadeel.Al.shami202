@@ -6,7 +6,6 @@
     <title>Hadeel AL-Shami - الموقع الرسمي والملف الشخصي</title>
     <meta name="description" content="الموقع الرسمي والصفحة التعريفية لـ هديل الشامي. تواصل معنا واطلع على آخر المنشورات والتحديثات." />
     
-    <!-- Open Graph Tags (OG Tags) للمعاينة الآمنة على فيسبوك وتليجرام وغيرها -->
     <meta property="og:title" content="Hadeel AL-Shami - الموقع الرسمي" />
     <meta property="og:description" content="الموقع الرسمي والصفحة التعريفية لـ هديل الشامي. تواصل معنا واطلع على آخر المنشورات والتحديثات." />
     <meta property="og:image" content="https://i.ibb.co/6Ry0q28/avatar-placeholder.png" />
@@ -14,11 +13,10 @@
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="ar_AR" />
 
-    <!-- Favicon لزيادة الأمان والثقة -->
     <link rel="icon" href="https://i.ibb.co/6Ry0q28/avatar-placeholder.png" type="image/png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <!-- Firebase SDKs (Compat Version للعمل بسلاسة مع السكربتات المباشرة) -->
+    <!-- Firebase SDKs (Compat Version) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
@@ -53,7 +51,7 @@
         .post-info { font-size: 14px; font-weight: 700; color: #050505; }
         .post-time { font-size: 12px; color: #65676b; font-weight: 500; }
         .globe-icon { color: #65676b; filter: grayscale(100%); font-size: 11px; vertical-align: middle; }
-        .post-body { padding: 0 16px 12px; font-size: 15px; line-height: 1.5; color: #050505; word-break: break-word; font-weight: 500; }
+        .post-body { padding: 0 16px 12px; font-size: 20px; line-height: 1.5; color: #050505; word-break: break-word; font-weight: 500; }
         .post-stats { display: flex; justify-content: space-between; padding: 10px 16px; font-size: 13px; color: #65676b; border-bottom: 1px solid #eee; font-weight: 600; align-items: center; }
         .post-stats span.clickable-comments:hover { text-decoration: underline; color: #0084ff; }
         .post-actions-bar { display: flex; justify-content: space-around; padding: 4px 0; }
@@ -163,7 +161,7 @@
         </div>
 
         <div id="postsFeed">
-            <div style="text-align: center; padding: 30px; color: #65676b; font-weight: 600;">جاري تحميل المنشورات  
+            <div style="text-align: center; padding: 30px; color: #65676b; font-weight: 600;">جاري تحميل المنشورات...</div>
         </div>
     </div>
 
@@ -343,7 +341,6 @@
             localStorage.setItem('viewer_device_id', currentDeviceId);
         }
 
-        // بيانات الموقع الافتراضية
         let accounts = [ { id: 1, name: "Hadeel AL-Shami", avatar: "", isMain: true, isVerified: true, link: "" } ];
         let coverImgUrl = "";
         let bioText = "مرحباً بكم في صفحتي الشخصية الرسمية<br>";
@@ -359,14 +356,14 @@
                 activeStory: activeStory,
                 posts: posts,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            }).then(() => {
+            }, { merge: true }).then(() => {
                 console.log("تم الحفظ في سحابة فايربيز بنجاح!");
             }).catch((error) => {
                 console.error("خطأ أثناء الحفظ في فايربيز: ", error);
             });
         }
 
-        // جلب البيانات ومزامنتها لحظياً من سحابة فايربيز
+        // الاستماع للتحديثات لحظياً من فايربيز لمنع الاختفاء
         function initFirebaseSync() {
             db.collection("site_data").doc("main_site").onSnapshot((docSnap) => {
                 if (docSnap.exists) {
@@ -375,13 +372,11 @@
                     if (data.coverImgUrl !== undefined) coverImgUrl = data.coverImgUrl;
                     if (data.bioText) bioText = data.bioText;
                     if (data.activeStory) activeStory = data.activeStory;
-                    if (data.posts) posts = data.posts;
+                    if (data.posts && Array.isArray(data.posts)) posts = data.posts;
                 } else {
-                    // إذا كانت المستندات غير موجودة بالسحابة لأول مرة، قم بإنشائها
                     saveDataLocally();
                 }
                 
-                // تحديث واجهة المستخدم بعد جلب البيانات
                 updateCoverDisplay();
                 updateMainProfileVerificationDisplay();
                 updateMainProfileNameDisplay();
@@ -393,6 +388,9 @@
                 console.error("خطأ في المزامنة مع فايربيز:", error);
             });
         }
+
+        // تشغيل المزامنة فور فتح الصفحة
+        initFirebaseSync();
 
         function getTimeAgo(timestamp) {
             if (!timestamp) return "منذ لحظات";
@@ -1444,7 +1442,7 @@
                                 <div class="comment-meta">
                                     <span>${getTimeAgo(c.time)}</span>
                                     <span onclick="reactToComment('${postId}', ${index})" style="color:${c.reaction ? '#0084ff' : 'inherit'}; font-weight:700; cursor:${isAdmin ? 'pointer' : 'default'};">${c.reaction || 'أعجبني'}</span>
-                                    <span onclick="startReply('${postId}', ${index})" style="color: #0084ff; cursor: pointer; font-weight:700;">رد</span>
+                                    <span onclick="startReply('${postId}', ${index})" style="cursor:pointer; font-weight:700;">رد</span>
                                     ${isAdmin ? `<span onclick="editComment('${postId}',${index})" style="color:#0084ff; cursor:pointer; font-weight:700;">تعديل</span>` : ''}
                                     ${isAdmin ? `<span onclick="deleteComment('${postId}',${index})" style="color:red; cursor:pointer; font-weight:700;">حذف</span>` : ''}
                                 </div>
@@ -1455,38 +1453,29 @@
                 }).join('');
             }
 
-            let replyBanner = currentReplyCommentIndex !== null ? `
-                <div style="background: #e4e6eb; padding: 6px 10px; border-radius: 6px; font-size: 12px; display: flex; justify-content: space-between; align-items: center; color: #050505; font-weight: 600;">
-                    <span>جاري الرد على تعليق رقم (${currentReplyCommentIndex + 1})</span>
-                    <span style="color: red; cursor: pointer; font-weight: 700;" onclick="cancelReply()">إلغاء</span>
-                </div>
-            ` : '';
-
-            let inputFieldHtml = isAdmin ? `<input type="text" id="commentTextInput" placeholder="اكتب تعليقاً..." style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 20px; outline: none; font-size: 14px; background: #f0f2f5; font-weight: 500;" onkeydown="if(event.key === 'Enter') submitComment('${postId}')">` : `<input type="text" id="commentTextInput" readonly placeholder="اكتب تعليقاً..." style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 20px; outline: none; font-size: 14px; background: #f0f2f5; font-weight: 500; cursor: default;">`;
-            let authorSelectHtml = isAdmin ? `
-                <div style="display: flex; gap: 8px; align-items: center;">
-                    <select id="commentAuthorSelect" style="padding: 6px; border-radius: 6px; border: 1px solid #ccc; font-size: 13px; font-weight: 600; outline: none; flex: 1;">
-                        ${accounts.map(acc => `<option value="${acc.id}">${acc.name}${acc.isVerified ? '✓' : ''}</option>`).join('')}
-                    </select>
-                    <input type="text" id="commentBadgeInput" placeholder="شارة اختيارية" style="padding: 6px; border-radius: 6px; border: 1px solid #ccc; font-size: 12px; font-weight: 600; outline: none; width: 130px;">
+            let mainAcc = accounts.find(a => a.isMain);
+            let replyAlertBox = currentReplyCommentIndex !== null ? `
+                <div style="background: #e7f3ff; padding: 6px 10px; border-radius: 6px; font-size: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span>جاري الرد على التعليق...</span>
+                    <span style="color: red; cursor: pointer; font-weight: 700;" onclick="cancelReply()">إلغاء الرد</span>
                 </div>
             ` : '';
 
             footer.innerHTML = `
-                ${replyBanner}
-                ${authorSelectHtml}
-                <div style="display: flex; gap: 8px; align-items: center;">
-                    ${inputFieldHtml}
-                    ${isAdmin ? `
-                        <label style="cursor: pointer; color: #0084ff; font-size: 18px; padding: 5px;" title="إرفاق صورة أو فيديو">
-                            <i class="fa-solid fa-camera"></i>
-                            <input type="file" id="commentFilePickerInput" accept="image/*,video/*" style="display: none;" onchange="handleCommentFileSelect(event)">
-                        </label>
-                        <button onclick="submitComment('${postId}')" style="background: #0084ff; color: #fff; border: none; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer;"><i class="fa-solid fa-paper-plane" style="font-size: 14px;"></i></button>
-                    ` : ''}
+                ${replyAlertBox}
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <select id="commentAuthorSelect" style="padding: 6px; border-radius: 6px; border: 1px solid #ccc; font-size: 13px; font-weight: 600; outline: none;"></select>
+                    <div id="commentFilePreview" style="font-size: 11px; color: green; font-weight: 700;"></div>
                 </div>
-                <div id="commentFilePreview" style="font-size: 11px; color: green; font-weight: 600; text-align: center;"></div>
+                <div style="display:flex; gap:8px; align-items:center; width:100%;">
+                    <input type="text" id="commentTextInput" placeholder="اكتب تعليقاً..." style="flex:1; padding:10px 14px; border-radius:20px; border:1px solid #ccd0d5; outline:none; font-size:14px; font-weight:500;">
+                    <i class="fa-solid fa-camera" style="font-size: 20px; color: #0084ff; cursor: pointer;" onclick="document.getElementById('commentFilePicker').click()" title="إرفاق صورة أو فيديو"></i>
+                    <button onclick="submitNewComment('${postId}')" style="background:#0084ff; color:#fff; border:none; padding:8px 16px; border-radius:20px; font-weight:700; cursor:pointer; font-size:14px;">تعليق</button>
+                </div>
             `;
+
+            let cAuthorSelect = document.getElementById('commentAuthorSelect');
+            cAuthorSelect.innerHTML = accounts.map(acc => `<option value="${acc.id}">${acc.name} ${acc.isVerified ? '✓' : ''}</option>`).join('');
 
             let commentsModalEl = document.getElementById('commentsModal');
             if (commentsModalEl.style.display !== 'flex') {
@@ -1500,64 +1489,50 @@
             if (el && el.style.display === 'flex') window.history.back();
         }
 
-        function submitComment(postId) {
-            if (!isAdmin) return;
-            let textInput = document.getElementById('commentTextInput');
-            let text = textInput.value.trim();
+        async function submitNewComment(postId) {
+            let inputEl = document.getElementById('commentTextInput');
+            let text = inputEl.value.trim();
+            let authorSelect = document.getElementById('commentAuthorSelect');
+            let selectedAcc = accounts.find(a => a.id == authorSelect.value) || accounts[0];
+
             if (!text && !commentTempFile.url) {
-                alert("اكتب تعليقاً أو أرفق صورة/فيديو.");
+                alert("اكتب تعليقاً أو أرفق ملفاً.");
                 return;
             }
+
             let post = posts.find(p => String(p.id) === String(postId));
             if (!post) return;
 
-            let authorId = 1;
-            let authorName = "Hadeel AL-Shami";
-            let authorAvatar = "";
-            let badge = "";
-            let authorSelect = document.getElementById('commentAuthorSelect');
-            let badgeInput = document.getElementById('commentBadgeInput');
+            if (!post.comments) post.comments = [];
 
-            if (authorSelect) {
-                authorId = parseInt(authorSelect.value);
-                let acc = accounts.find(a => a.id === authorId);
-                if (acc) {
-                    authorName = acc.name;
-                    authorAvatar = acc.avatar;
-                }
-            }
-            if (badgeInput) badge = badgeInput.value.trim();
-
-            let newEntry = {
-                authorId: authorId,
-                authorName: authorName,
-                authorAvatar: authorAvatar,
-                badge: badge,
+            let commentObj = {
+                authorId: selectedAcc.id,
+                authorName: selectedAcc.name,
+                authorAvatar: selectedAcc.avatar || "",
+                badge: isAdmin && selectedAcc.isMain ? "المسؤول" : "",
                 text: text,
+                time: Date.now(),
                 attachment: commentTempFile.url,
                 attachmentType: commentTempFile.type,
-                time: Date.now()
+                reaction: "",
+                replies: []
             };
 
-            if (currentReplyCommentIndex !== null) {
+            if (currentReplyCommentIndex !== null && post.comments[currentReplyCommentIndex]) {
                 if (!post.comments[currentReplyCommentIndex].replies) post.comments[currentReplyCommentIndex].replies = [];
-                post.comments[currentReplyCommentIndex].replies.push(newEntry);
+                post.comments[currentReplyCommentIndex].replies.push(commentObj);
                 currentReplyCommentIndex = null;
             } else {
-                if (!post.comments) post.comments = [];
-                post.comments.push(newEntry);
+                post.comments.push(commentObj);
             }
+
             updateCommentsCount(post);
             saveDataLocally();
             commentTempFile = { url: "", type: "none" };
+            inputEl.value = "";
             openComments(postId);
             renderFeed();
         }
-
-        // تشغيل المزامنة عند تحميل الصفحة
-        window.onload = function() {
-            initFirebaseSync();
-        };
     </script>
 </body>
 </html>
