@@ -275,7 +275,13 @@
                 <span style="font-weight:700;" id="modalAuthorName">Hadeel AL-Shami</span>
             </div>
             <textarea id="postText" style="width:100%; border:none; height:100px; font-size:16px; outline:none; font-weight:500;" placeholder="بم تفكر؟"></textarea>
+            
             <div style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
+                <label style="font-size: 13px; font-weight: 700; color: #65676b; display: block; margin-bottom: 5px;">وقت المنشور (اختياري، اتركه فارغاً ليكون الآن):</label>
+                <input type="number" id="postCustomHoursAgo" placeholder="عدد الساعات السابقة (مثال: 2 يعني قبل ساعتين)" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; outline: none; font-weight: 600; margin-bottom: 10px;">
+            </div>
+
+            <div style="margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px;">
                 <label style="font-size: 13px; font-weight: 700; color: #65676b; display: block; margin-bottom: 5px;">اختر نوع التفاعل بجانب الإعجاب والقلب:</label>
                 <select id="postReactionTypeSelect" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; outline: none; font-weight: 600; margin-bottom: 10px;">
                     <option value="😆">😆 (ضحك)</option>
@@ -405,24 +411,40 @@
             renderFeed();
         }
 
+        // دالة ديناميكية تتغير تلقائياً مع مرور الوقت بناءً على الساعة الحالية
         function getTimeAgo(timestamp) {
             if (!timestamp) return "منذ لحظات";
+            // إذا كان النص قديماً ومكتوباً بصيغة ثابتة
             if (typeof timestamp === 'string' && !/^\d+$/.test(timestamp)) return timestamp;
+            
             let now = Date.now();
             let elapsed = Math.floor((now - Number(timestamp)) / 1000);
+            
             if (elapsed < 30) return "منذ لحظات";
             if (elapsed < 60) return `منذ ${elapsed} ثانية`;
+            
             let minutes = Math.floor(elapsed / 60);
             if (minutes < 60) return `منذ ${minutes} دقيقة`;
+            
             let hours = Math.floor(minutes / 60);
             if (hours < 24) return `منذ ${hours} ساعة`;
+            
             let days = Math.floor(hours / 24);
             if (days < 30) return `منذ ${days} يوم`;
+            
             let months = Math.floor(days / 30);
             if (months < 12) return `منذ ${months} شهر`;
+            
             let years = Math.floor(days / 365);
             return `منذ ${years} سنة`;
         }
+
+        // تحديث أوقات المنشورات تلقائياً كل دقيقة لتبقى متزامنة مع الساعة
+        setInterval(() => {
+            if (document.getElementById('postsFeed') && window.posts.length > 0) {
+                renderFeed();
+            }
+        }, 60000);
 
         function renderReactionsHtml(reactionsStr, reactionType = "😆") {
             let countVal = reactionsStr !== undefined && reactionsStr !== null && reactionsStr !== "undefined" ? String(reactionsStr).replace(/[^\d]/g, '') : "";
@@ -1015,12 +1037,12 @@
                         renderFeed();
                     }
                 } else if (choice === "2") {
-                    let customVal = prompt("أدخل نص الوقت المخصص:", "منذ دقيقة");
-                    if (customVal !== null) {
-                        post.comments[commentIndex].time = customVal.trim();
+                    let customVal = prompt("أدخل عدد الساعات الماضية (مثال: 5):", "1");
+                    if (customVal !== null && !isNaN(customVal)) {
+                        post.comments[commentIndex].time = Date.now() - (Number(customVal) * 3600000);
                         saveDataLocally();
                         openComments(postId);
-                        alert("تم تحديث الوقت بنجاح.");
+                        alert("تم تحديث وقت التعليق بنجاح.");
                     }
                 }
             }
@@ -1040,12 +1062,12 @@
                         renderFeed();
                     }
                 } else if (choice === "2") {
-                    let customVal = prompt("أدخل نص الوقت المخصص للرد:", "منذ دقيقة");
-                    if (customVal !== null) {
-                        post.comments[commentIndex].replies[replyIndex].time = customVal.trim();
+                    let customVal = prompt("أدخل عدد الساعات الماضية للرد (مثال: 2):", "1");
+                    if (customVal !== null && !isNaN(customVal)) {
+                        post.comments[commentIndex].replies[replyIndex].time = Date.now() - (Number(customVal) * 3600000);
                         saveDataLocally();
                         openComments(postId);
-                        alert("تم تحديث الوقت بنجاح.");
+                        alert("تم تحديث وقت الرد بنجاح.");
                     }
                 }
             }
@@ -1458,6 +1480,7 @@
             document.getElementById('postModalTitle').innerText = "إنشاء منشور جديد";
             document.getElementById('postModalSubmitBtn').innerText = "نشر";
             document.getElementById('postText').value = "";
+            document.getElementById('postCustomHoursAgo').value = "";
             tempFiles = [];
             document.getElementById('filePreview').innerText = "";
             document.getElementById('clearPostMediaBtn').style.display = 'none';
@@ -1478,6 +1501,7 @@
             document.getElementById('postModalTitle').innerText = "تعديل المنشور";
             document.getElementById('postModalSubmitBtn').innerText = "حفظ التعديلات";
             document.getElementById('postText').value = post.text || "";
+            document.getElementById('postCustomHoursAgo').value = "";
             tempFiles = post.mediaFiles ? [...post.mediaFiles] : [];
             document.getElementById('postLockedCheckbox').checked = post.isLocked || false;
             if (post.reactions) document.getElementById('postReactionsInput').value = post.reactions;
@@ -1509,10 +1533,17 @@
             let reactionType = document.getElementById('postReactionTypeSelect').value;
             let reactionsCount = document.getElementById('postReactionsInput').value.trim() || "5";
             let isLocked = document.getElementById('postLockedCheckbox').checked;
+            let customHoursInput = document.getElementById('postCustomHoursAgo').value.trim();
 
             if (!text && tempFiles.length === 0) {
                 alert("يرجى كتابة نص المنشور أو إرفاق صورة/فيديو.");
                 return;
+            }
+
+            // حساب وقت النشر بناءً على الساعات المدخلة أو الوقت الحالي
+            let postTime = Date.now();
+            if (customHoursInput !== "" && !isNaN(customHoursInput)) {
+                postTime = Date.now() - (Number(customHoursInput) * 3600000);
             }
 
             if (currentEditingPostId !== null) {
@@ -1524,6 +1555,7 @@
                     post.reactionType = reactionType;
                     post.reactions = reactionsCount;
                     post.isLocked = isLocked;
+                    if (customHoursInput !== "") post.time = postTime;
                 }
                 currentEditingPostId = null;
                 alert("تم تحديث المنشور بنجاح وحفظه سحابياً!");
@@ -1533,7 +1565,7 @@
                     authorId: authorId,
                     text: text,
                     mediaFiles: [...tempFiles],
-                    time: Date.now(),
+                    time: postTime,
                     reactions: reactionsCount,
                     reactionType: reactionType,
                     commentsCount: "0 تعليقات",
