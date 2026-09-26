@@ -300,6 +300,7 @@
                     <input type="file" id="filePicker" accept="image/*,video/*" multiple style="display:none;" onchange="handleFileSelect(event)">
                 </label>
                 <div id="filePreview" style="margin-top:10px; font-size:13px; color:green; text-align:center; font-weight:700;"></div>
+                <button type="button" id="clearPostMediaBtn" onclick="clearPostMedia()" style="display:none; width:100%; background:#ffebee; color:#c62828; border:1px solid #ef9a9a; border-radius:6px; padding:8px; font-weight:700; margin-top:8px; cursor:pointer;"><i class="fa-solid fa-trash"></i> مسح الصور/الملفات المرفقة من المنشور وإبقاء النص فقط</button>
             </div>
         </div>
     </div>
@@ -347,7 +348,7 @@
         let activeStory = { mediaUrl: "", mediaType: "", time: Date.now(), viewers: [] };
         let posts = [];
 
-        // دالة حفظ البيانات في سحابة فايربيز (Firestore)
+        // دالة حفظ البيانات في سحابة فايربيز (Firestore) بشكل دائم
         function saveDataLocally() {
             db.collection("site_data").doc("main_site").set({
                 accounts: accounts,
@@ -363,7 +364,7 @@
             });
         }
 
-        // الاستماع للتحديثات لحظياً من فايربيز لمنع الاختفاء
+        // الاستماع للتحديثات لحظياً من فايربيز لمنع الاختفاء والضياع
         function initFirebaseSync() {
             db.collection("site_data").doc("main_site").onSnapshot((docSnap) => {
                 if (docSnap.exists) {
@@ -427,7 +428,8 @@
             `;
         }
 
-        function compressImage(file, maxWidth = 1000, maxHeight = 1000, quality = 0.75) {
+        // دالة ضغط الصور لتقليل الحجم وتوفير مساحة السحابة (Cloud Storage Optimization)
+        function compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0.65) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
@@ -567,7 +569,7 @@
             const file = e.target.files[0];
             if (file) {
                 try {
-                    let compressedUrl = await compressImage(file, 400, 400, 0.75);
+                    let compressedUrl = await compressImage(file, 250, 250, 0.7);
                     let mainAcc = accounts.find(a => a.isMain);
                     if (mainAcc) {
                         mainAcc.avatar = compressedUrl;
@@ -575,7 +577,7 @@
                     }
                     updateAvatarDisplay('avatarImg', 'avatarPlaceholderIcon', compressedUrl);
                     renderFeed();
-                    alert("تم تحديث صورة الصفحة وحفظها سحابياً!");
+                    alert("تم ضغط وتحديث صورة الصفحة وحفظها سحابياً بكفاءة عالية!");
                 } catch(err) {
                     alert("حدث خطأ أثناء تحميل وضغط الصورة.");
                 }
@@ -587,7 +589,7 @@
             const file = e.target.files[0];
             if (file && targetAccountIdForAvatar !== null) {
                 try {
-                    let compressedUrl = await compressImage(file, 400, 400, 0.75);
+                    let compressedUrl = await compressImage(file, 250, 250, 0.7);
                     let acc = accounts.find(a => a.id === targetAccountIdForAvatar);
                     if (acc) {
                         acc.avatar = compressedUrl;
@@ -595,7 +597,7 @@
                         saveDataLocally();
                     }
                     renderFeed();
-                    alert("تم تحديث صورة الحساب بنجاح!");
+                    alert("تم ضغط وتحديث صورة الحساب بنجاح!");
                     targetAccountIdForAvatar = null;
                 } catch(err) {
                     alert("حدث خطأ أثناء تحميل وضغط الصورة.");
@@ -629,10 +631,10 @@
             const file = e.target.files[0];
             if (file) {
                 try {
-                    let base64Url = file.type.startsWith('video') ? await compressVideo(file) : await compressImage(file, 900, 900, 0.8);
+                    let base64Url = file.type.startsWith('video') ? await compressVideo(file) : await compressImage(file, 600, 600, 0.65);
                     commentTempFile = { url: base64Url, type: file.type.startsWith('video') ? 'video' : 'image' };
                     let previewEl = document.getElementById('commentFilePreview');
-                    if (previewEl) previewEl.innerText = "تم إرفاق الملف بنجاح";
+                    if (previewEl) previewEl.innerText = "تم إرفاق الملف وضغطه بنجاح";
                 } catch(err) {
                     alert("حدث خطأ أثناء رفع الملف.");
                 }
@@ -643,12 +645,12 @@
             const file = e.target.files[0];
             if (file) {
                 try {
-                    let base64Url = file.type.startsWith('video') ? await compressVideo(file) : await compressImage(file, 900, 1200, 0.8);
+                    let base64Url = file.type.startsWith('video') ? await compressVideo(file) : await compressImage(file, 700, 900, 0.7);
                     let type = file.type.startsWith('video') ? 'video' : 'image';
                     activeStory = { mediaUrl: base64Url, mediaType: type, time: Date.now(), viewers: [] };
                     updateStoryUI();
                     saveDataLocally();
-                    alert("تم نشر القصة وحفظها سحابياً بنجاح!");
+                    alert("تم نشر وضغط القصة وحفظها سحابياً بنجاح!");
                 } catch(err) {
                     alert("حدث خطأ أثناء رفع القصة.");
                 }
@@ -954,10 +956,10 @@
             const file = e.target.files[0];
             if (file) {
                 try {
-                    coverImgUrl = await compressImage(file, 1200, 600, 0.8);
+                    coverImgUrl = await compressImage(file, 900, 450, 0.65);
                     updateCoverDisplay();
                     saveDataLocally();
-                    alert("تم تحديث غلاف الصفحة وحفظه سحابياً!");
+                    alert("تم ضغط وتحديث غلاف الصفحة وحفظه سحابياً بكفاءة!");
                 } catch(err) {
                     alert("حدث خطأ أثناء رفع صورة الغلاف.");
                 }
@@ -1200,6 +1202,8 @@
                 let postReactionsHtml = renderReactionsHtml(p.reactions, p.reactionType);
                 let postCommentsCount = p.commentsCount ? p.commentsCount : "0 تعليقات";
 
+                let textHtml = p.text && p.text.trim() !== "" ? `<div class="post-body"><div>${linkify(p.text)}</div></div>` : '';
+
                 return `
                     <div class="post-card${lockedClass}">
                         <div class="post-header">
@@ -1219,9 +1223,7 @@
                                 </div>
                             ` : `<i class="fa-solid fa-ellipsis" style="color: #65676b; cursor: pointer;"></i>`}
                         </div>
-                        <div class="post-body">
-                            <div>${linkify(p.text)}</div>
-                        </div>
+                        ${textHtml}
                         ${renderMediaFiles(mediaFilesList, p.id)}
                         <div class="post-stats">
                             <span>${postReactionsHtml}</span>
@@ -1250,6 +1252,7 @@
             let reactionTypeSelect = document.getElementById('postReactionTypeSelect');
             let lockedCheckbox = document.getElementById('postLockedCheckbox');
             let filePreviewEl = document.getElementById('filePreview');
+            let clearMediaBtn = document.getElementById('clearPostMediaBtn');
             let filePickerEl = document.getElementById('filePicker');
             filePickerEl.value = "";
             tempFiles = [];
@@ -1270,8 +1273,10 @@
                 if (post && post.mediaFiles && post.mediaFiles.length > 0) {
                     tempFiles = [...post.mediaFiles];
                     filePreviewEl.innerText = `يوجد ${tempFiles.length} ملف/ملفات مرفقة حالياً.`;
+                    clearMediaBtn.style.display = 'block';
                 } else {
                     filePreviewEl.innerText = "";
+                    clearMediaBtn.style.display = 'none';
                 }
             } else {
                 titleEl.innerText = "إنشاء منشور";
@@ -1281,6 +1286,7 @@
                 reactionTypeSelect.value = "😆";
                 lockedCheckbox.checked = false;
                 filePreviewEl.innerText = "";
+                clearMediaBtn.style.display = 'none';
             }
             updateModalAuthorPreview();
             authorSelect.onchange = updateModalAuthorPreview;
@@ -1290,6 +1296,12 @@
                 window.history.pushState({ modal: 'createPostScreen' }, '');
                 screen.style.display = 'flex';
             }
+        }
+
+        function clearPostMedia() {
+            tempFiles = [];
+            document.getElementById('filePreview').innerText = "تمت إزالة الصور/الملفات المرفقة. سيبقى النص فقط عند الحفظ.";
+            document.getElementById('clearPostMediaBtn').style.display = 'none';
         }
 
         function updateModalAuthorPreview() {
@@ -1314,17 +1326,18 @@
                     alert("يمكنك إرفاق بحد أقصى 5 صور أو فيديوهات فقط لكل منشور.");
                     return;
                 }
-                document.getElementById('filePreview').innerText = "جاري ضغط ومعالجة الملفات تلقائياً...";
+                document.getElementById('filePreview').innerText = "جاري ضغط ومعالجة الملفات لتوفير المساحة السحابية...";
                 for (let i = 0; i < files.length; i++) {
                     let file = files[i];
                     try {
-                        let base64Url = file.type.startsWith('video') ? await compressVideo(file) : await compressImage(file, 1000, 1000, 0.75);
+                        let base64Url = file.type.startsWith('video') ? await compressVideo(file) : await compressImage(file, 800, 800, 0.65);
                         tempFiles.push({ url: base64Url, type: file.type.startsWith('video') ? 'video' : 'image' });
                     } catch(err) {
                         console.error(err);
                     }
                 }
-                document.getElementById('filePreview').innerText = `تم إرفاق ${tempFiles.length} ملفات بنجاح.`;
+                document.getElementById('filePreview').innerText = `تم ضغط وإرفاق ${tempFiles.length} ملفات بنجاح.`;
+                document.getElementById('clearPostMediaBtn').style.display = 'block';
             }
             e.target.value = "";
         }
@@ -1336,8 +1349,8 @@
             let isLocked = document.getElementById('postLockedCheckbox').checked;
             let authorId = parseInt(document.getElementById('postAuthorSelect').value);
 
-            if(!text.trim() && tempFiles.length === 0 && currentEditingPostId === null) {
-                alert("اكتب شيئاً أو أرفق صور أو فيديوهات للنشر.");
+            if(!text.trim() && tempFiles.length === 0) {
+                alert("لا يمكنك نشر منشور فارغ تماماً (يجب وجود نص أو صورة/فيديو على الأقل).");
                 return;
             }
             let finalReactionsVal = reactions && reactions.trim() !== "" ? reactions.trim() : "5";
@@ -1372,6 +1385,7 @@
             saveDataLocally();
             tempFiles = [];
             document.getElementById('filePreview').innerText = "";
+            document.getElementById('clearPostMediaBtn').style.display = 'none';
             closePostModal();
             renderFeed();
         }
@@ -1528,7 +1542,7 @@
 
             updateCommentsCount(post);
             saveDataLocally();
-            commentTempFile = { url: "", type: "none" };
+            commentTempFile = { url: "", type: "none"  };
             inputEl.value = "";
             openComments(postId);
             renderFeed();
