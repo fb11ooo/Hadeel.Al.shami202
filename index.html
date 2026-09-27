@@ -47,7 +47,7 @@
         .post-info { font-size: 14px; font-weight: 700; color: #050505; }
         .post-time { font-size: 12px; color: #65676b; font-weight: 500; }
         .globe-icon { color: #65676b; filter: grayscale(100%); font-size: 11px; vertical-align: middle; }
-        .post-body { padding: 0 16px 12px; font-size: 20px; line-height: 1.5; color: #050505; word-break: break-word; font-weight: 500; }
+        .post-body { padding: 0 16px 12px; font-size: 16px; line-height: 1.5; color: #050505; word-break: break-word; font-weight: 500; }
         .post-stats { display: flex; justify-content: space-between; padding: 10px 16px; font-size: 13px; color: #65676b; border-bottom: 1px solid #eee; font-weight: 600; align-items: center; }
         .post-stats span.clickable-comments:hover { text-decoration: underline; color: #0084ff; }
         .post-actions-bar { display: flex; justify-content: space-around; padding: 4px 0; }
@@ -67,7 +67,7 @@
         .comment-item { display: flex; gap: 10px; margin-bottom: 15px; align-items: flex-start; }
         .comment-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; cursor: pointer; background: #e4e6eb; }
         .comment-bubble-container { max-width: 85%; }
-        .comment-bubble { background: #f0f2f5; padding: 10px 14px; border-radius: 18px; font-size: 17px; color: #050505; line-height: 1.4; word-break: break-word; position: relative; font-weight: 500; }
+        .comment-bubble { background: #f0f2f5; padding: 10px 14px; border-radius: 18px; font-size: 15px; color: #050505; line-height: 1.4; word-break: break-word; position: relative; font-weight: 500; }
         .comment-author-name { font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; gap: 4px; margin-bottom: 2px; cursor: pointer; }
         .comment-badge { background: #e4e6eb; font-size: 11px; padding: 1px 6px; border-radius: 4px; color: #65676b; margin-right: 5px; font-weight: 600; }
         .comment-meta { font-size: 11px; color: #65676b; margin-top: 3px; padding-right: 10px; display: flex; gap: 10px; align-items: center; font-weight: 600; }
@@ -136,7 +136,7 @@
 
         <div class="page-category"> · </div>
 
-        <div class="bio" id="bioTextContainer" onclick="handleBioClick()">الي جربني يعلق على منشوراتي <br></div>
+        <div class="bio" id="bioTextContainer" onclick="handleBioClick()">.... <br></div>
 
         <div class="profile-action-buttons">
             <button class="btn-follow-page"><i class="fa-solid fa-user-plus"></i> إضافة صديق</button>
@@ -608,7 +608,7 @@
                         saveDataLocally();
                     }
                     renderFeed();
-                    alert("تم ضغط وتحديث صورة الحساب بنجاح!");
+                    alert("تم ضغط وتحديث صورة الحساب بنجاح وحفظها سحابياً!");
                     targetAccountIdForAvatar = null;
                 } catch(err) {
                     alert("حدث خطأ أثناء تحميل وضغط الصورة.");
@@ -1479,7 +1479,6 @@
                 }).join('');
             }
 
-            // إخفاء صندوق إرسال التعليقات والتحكمات عن الزوار غير المسجلين كأدمن تماماً
             if (isAdmin) {
                 let replyAlertBox = currentReplyCommentIndex !== null ? `
                     <div style="background: #e7f3ff; padding: 6px 10px; border-radius: 6px; font-size: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
