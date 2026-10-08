@@ -1264,9 +1264,10 @@
                         }).join('');
                     }
 
+                    // التعديل هنا: زر عرض الردود أصبح باللون الأزرق وبحجم أكبر وواضح (Facebook Style)
                     let showRepliesToggleBtn = repliesList.length > 0 ? `
-                        <div style="font-size: 11px; color: #65676b; font-weight: 700; margin-top: 4px; padding-right: 10px; cursor: pointer;" onclick="toggleReplies('${postId}',${cIdx})">
-                            <i class="fa-solid fa-share fa-rotate-180" style="font-size: 9px; margin-left: 3px;"></i> ${isRepliesVisible ? 'إخفاء الردود' : `عرض ${repliesList.length} من الردود`}
+                        <div style="font-size: 14px; color: #0084ff; font-weight: 700; margin-top: 6px; padding-right: 10px; cursor: pointer; display: flex; align-items: center; gap: 6px;" onclick="toggleReplies('${postId}',${cIdx})">
+                            <i class="fa-solid fa-share fa-rotate-180" style="font-size: 11px;"></i> ${isRepliesVisible ? 'إخفاء الردود' : `عرض ${repliesList.length} من الردود`}
                         </div>
                     ` : '';
 
