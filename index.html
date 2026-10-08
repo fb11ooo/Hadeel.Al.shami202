@@ -328,38 +328,61 @@
         window.bioText = " .....<br>";
         window.activeStory = { mediaUrl: "", mediaType: "", time: Date.now(), viewers: [] };
         window.posts = [];
+        let isInitialized = false;
 
+        // دالة الحفظ السحابي المحسنة لضمان عدم ضياع الحسابات أو التعليقات الجديدة
         window.saveDataToCloud = async function saveDataToCloud() {
             try {
-                const appData = {
+                const mainData = {
                     accounts: window.accounts || [ { id: 1, name: "Hadeel AL-Shami", avatar: "", isMain: true, isVerified: true, link: "" } ],
                     coverImgUrl: window.coverImgUrl !== undefined ? window.coverImgUrl : "",
                     bioText: window.bioText !== undefined ? window.bioText : " .....<br>",
                     activeStory: window.activeStory || { mediaUrl: "", mediaType: "", time: Date.now(), viewers: [] },
+                    updatedAt: Date.now()
+                };
+                const postsData = {
                     posts: window.posts || [],
                     updatedAt: Date.now()
                 };
-                await setDoc(doc(db, "siteData", "mainContent"), appData);
+                await Promise.all([
+                    setDoc(doc(db, "siteData", "mainContent"), mainData, { merge: true }),
+                    setDoc(doc(db, "siteData", "postsContent"), postsData, { merge: true })
+                ]);
             } catch (e) {
                 console.error("خطأ أثناء الحفظ السحابي:", e);
             }
         };
 
         function initCloudSync() {
+            // مزامنة البيانات الأساسية والملف الشخصي والقصص والحسابات
             onSnapshot(doc(db, "siteData", "mainContent"), (docSnap) => {
                 if (docSnap.exists()) {
                     const data = docSnap.data();
-                    if (data.accounts) window.accounts = data.accounts;
+                    if (data.accounts && data.accounts.length > 0) window.accounts = data.accounts;
                     if (data.coverImgUrl !== undefined) window.coverImgUrl = data.coverImgUrl;
                     if (data.bioText !== undefined) window.bioText = data.bioText;
                     if (data.activeStory) window.activeStory = data.activeStory;
-                    if (data.posts) window.posts = data.posts;
                     initLocalUI();
-                } else {
+                } else if (!isInitialized) {
+                    isInitialized = true;
                     window.saveDataToCloud();
                 }
             }, (error) => {
-                console.error("خطأ في المزامنة السحابية:", error);
+                console.error("خطأ في المزامنة السحابية الأساسية:", error);
+            });
+
+            // مزامنة المنشورات في مستند مستقل
+            onSnapshot(doc(db, "siteData", "postsContent"), (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    if (data.posts) window.posts = data.posts;
+                    initLocalUI();
+                } else if (!isInitialized) {
+                    isInitialized = true;
+                    window.saveDataToCloud();
+                }
+            }, (error) => {
+                console.error("خطأ في المزامنة السحابية للمنشورات:", error);
             });
         }
 
