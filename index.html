@@ -51,7 +51,6 @@
         .globe-icon { color: #65676b; filter: grayscale(100%); font-size: 11px; vertical-align: middle; }
         .post-body { padding: 0 16px 12px; font-size: 16px; line-height: 1.5; color: #050505; word-break: break-word; font-weight: 500; }
         
-        /* تنسيق شبكة الصور داخل المنشور */
         .post-media-grid { display: grid; gap: 2px; margin-top: 10px; background: #fff; width: 100%; }
         .post-media-grid.count-1 { grid-template-columns: 1fr; }
         .post-media-grid.count-2 { grid-template-columns: 1fr 1fr; }
@@ -344,6 +343,7 @@
         window.currentEditingPostId = null;
         window.currentReplyCommentIndex = null;
         window.currentVideoPostId = null;
+        window.postsLoaded = false;
         let lockClickCount = 0;
         let lockTimer = null;
         window.visibleRepliesMap = {};
@@ -414,6 +414,7 @@
                 });
                 loadedPosts.sort((a, b) => b.time - a.time);
                 window.posts = loadedPosts;
+                window.postsLoaded = true;
                 renderFeed();
                 let commentsModalEl = document.getElementById('commentsModal');
                 if (commentsModalEl && commentsModalEl.style.display === 'flex' && window.currentPostIdForComment) {
@@ -808,7 +809,7 @@
 
         window.openSelectCommentAccountModal = async function() {
             if (!window.isAdmin) return;
-            let accountsListOptions = window.accounts.map((acc, index) => `${index + 1}. ${acc.name} ${acc.isVerified ? '✓' : ''}`).join('\n');
+            let accountsListOptions = window.accounts.map((acc, index) => `${index + 1}. ${acc.name}${acc.isVerified ? '✓' : ''}`).join('\n');
             let promptText = `اختر الحساب الذي تريد التعليق منه:\n0. الحساب الحالي (${window.fakeUser.name}) - [تغيير الصورة أو الاسم]\n` + accountsListOptions + `\n\nأدخل الرقم المطلوب:`;
             let choice = prompt(promptText);
             if (choice !== null) {
@@ -1059,7 +1060,7 @@
         }
 
         window.manageAccounts = async function() {
-            let listStr = window.accounts.map((acc, index) => `${index + 1}. ${acc.name} ${acc.isVerified ? '✓(موثق)' : ''}`).join('\n');
+            let listStr = window.accounts.map((acc, index) => `${index + 1}. ${acc.name}${acc.isVerified ? '✓(موثق)' : ''}`).join('\n');
             let choice = prompt(`إدارة الحسابات والتوثيق:\n${listStr}\n\nاختر رقماً للإجراء:\n1. إضافة حساب جديد\n2. تغيير اسم الحساب\n3. تغيير صورة حساب\n4. تبديل حالة التوثيق\n5. إعدادات حساب التعليقات`);
             if (choice === "1") {
                 let name = prompt("أدخل اسم الحساب الجديد:");
@@ -1071,7 +1072,7 @@
                     alert("تم إضافة الحساب بنجاح في السحابة.");
                 }
             } else if (choice === "2") {
-                let accNum = prompt(`اختر رقم الحساب لتعديل اسمه:\n` + window.accounts.map((acc, i) => `${i + 1}: ${acc.name}`).join('\n'));
+                let accNum = prompt(`اختر رقم الحساب لتعديل اسمه:\n` + window.accounts.map((acc, i) => `${i + 1}:${acc.name}`).join('\n'));
                 let idx = parseInt(accNum) - 1;
                 if (!isNaN(idx) && window.accounts[idx]) {
                     let newName = prompt(`أدخل الاسم الجديد لـ (${window.accounts[idx].name}):`, window.accounts[idx].name);
@@ -1084,14 +1085,14 @@
                     }
                 }
             } else if (choice === "3") {
-                let accNum = prompt(`اختر رقم الحساب لتغيير صورته الشخصية:\n` + window.accounts.map((acc, i) => `${i + 1}: ${acc.name}`).join('\n'));
+                let accNum = prompt(`اختر رقم الحساب لتغيير صورته الشخصية:\n` + window.accounts.map((acc, i) => `${i + 1}:${acc.name}`).join('\n'));
                 let idx = parseInt(accNum) - 1;
                 if (!isNaN(idx) && window.accounts[idx]) {
                     targetAccountIdForAvatar = window.accounts[idx].id;
                     document.getElementById('accountAvatarPicker').click();
                 }
             } else if (choice === "4") {
-                let accNum = prompt(`اختر رقم الحساب لتبديل حالة التوثيق:\n` + window.accounts.map((acc, i) => `${i + 1}: ${acc.name}`).join('\n'));
+                let accNum = prompt(`اختر رقم الحساب لتبديل حالة التوثيق:\n` + window.accounts.map((acc, i) => `${i + 1}:${acc.name}`).join('\n'));
                 let idx = parseInt(accNum) - 1;
                 if (!isNaN(idx) && window.accounts[idx]) {
                     window.accounts[idx].isVerified = !window.accounts[idx].isVerified;
@@ -1248,16 +1249,14 @@
                                     <div style="max-width: 80%;">
                                         <div style="background: #f0f2f5; padding: 8px 12px; border-radius: 14px; font-size: 14px; color: #050505; font-weight: 500; word-break: break-word;">
                                             <span style="font-weight: 700; font-size: 12px; display: inline-flex; align-items: center; gap: 3px; cursor: pointer;">
-                                                ${rName} ${rVerified}
+                                                ${rName}${rVerified}
                                             </span>
-                                            <div style="margin-top: 2px;">${linkify(r.text)}</div>
-                                            ${r.fileUrl ? (r.fileType === 'video' ? `<video src="${r.fileUrl}" controls style="max-width:140px; border-radius:6px; margin-top:6px; display:block;" onclick="event.stopPropagation()"></video>` : `<img src="${r.fileUrl}" class="comment-attachment" onclick="openImageViewer('${r.fileUrl}')">`) : ''}
+                                            <div style="margin-top: 2px;">${linkify(r.text)}</div>${r.fileUrl ? (r.fileType === 'video' ? `<video src="${r.fileUrl}" controls style="max-width:140px; border-radius:6px; margin-top:6px; display:block;" onclick="event.stopPropagation()"></video>` : `<img src="${r.fileUrl}" class="comment-attachment" onclick="openImageViewer('${r.fileUrl}')">`) : ''}
                                         </div>
                                         <div style="font-size: 10px; color: #65676b; margin-top: 2px; padding-right: 8px; display: flex; gap: 8px; font-weight: 600;">
                                             <span>أعجبني</span>
                                             <span>رد</span>
-                                            <span>${getTimeAgo(r.time)}</span>
-                                            ${window.isAdmin ? `<span style="color: #0084ff; cursor: pointer;" onclick="editReply('${postId}', ${cIdx},${rIdx})">تعديل</span> <span style="color: #c62828; cursor: pointer;" onclick="deleteReply('${postId}', ${cIdx},${rIdx})">حذف</span>` : ''}
+                                            <span>${getTimeAgo(r.time)}</span>${window.isAdmin ? `<span style="color: #0084ff; cursor: pointer;" onclick="editReply('${postId}', ${cIdx},${rIdx})">تعديل</span> <span style="color: #c62828; cursor: pointer;" onclick="deleteReply('${postId}', ${cIdx},${rIdx})">حذف</span>` : ''}
                                         </div>
                                     </div>
                                 </div>
@@ -1266,7 +1265,7 @@
                     }
 
                     let showRepliesToggleBtn = repliesList.length > 0 ? `
-                        <div style="font-size: 11px; color: #65676b; font-weight: 700; margin-top: 4px; padding-right: 10px; cursor: pointer;" onclick="toggleReplies('${postId}', ${cIdx})">
+                        <div style="font-size: 11px; color: #65676b; font-weight: 700; margin-top: 4px; padding-right: 10px; cursor: pointer;" onclick="toggleReplies('${postId}',${cIdx})">
                             <i class="fa-solid fa-share fa-rotate-180" style="font-size: 9px; margin-left: 3px;"></i> ${isRepliesVisible ? 'إخفاء الردود' : `عرض ${repliesList.length} من الردود`}
                         </div>
                     ` : '';
@@ -1279,19 +1278,16 @@
                             <div class="comment-bubble-container">
                                 <div class="comment-bubble">
                                     <div class="comment-author-name">
-                                        ${authorName} ${verifiedHtml}
+                                        ${authorName}${verifiedHtml}
                                     </div>
-                                    <div>${linkify(c.text)}</div>
-                                    ${c.fileUrl ? (c.fileType === 'video' ? `<video src="${c.fileUrl}" controls style="max-width:160px; border-radius:8px; margin-top:8px; display:block;" onclick="event.stopPropagation()"></video>` : `<img src="${c.fileUrl}" class="comment-attachment" onclick="openImageViewer('${c.fileUrl}')">`) : ''}
+                                    <div>${linkify(c.text)}</div>${c.fileUrl ? (c.fileType === 'video' ? `<video src="${c.fileUrl}" controls style="max-width:160px; border-radius:8px; margin-top:8px; display:block;" onclick="event.stopPropagation()"></video>` : `<img src="${c.fileUrl}" class="comment-attachment" onclick="openImageViewer('${c.fileUrl}')">`) : ''}
                                 </div>
                                 <div class="comment-meta">
                                     <span>أعجبني</span>
                                     <span style="cursor: pointer;" onclick="prepareReply('${postId}', ${cIdx}, '${authorName}')">رد</span>
-                                    <span>${getTimeAgo(c.time)}</span>
-                                    ${window.isAdmin ? `<span style="color: #0084ff; cursor: pointer;" onclick="editComment('${postId}',${cIdx})">تعديل</span> <span style="color: #c62828; cursor: pointer;" onclick="deleteComment('${postId}',${cIdx})">حذف</span>` : ''}
+                                    <span>${getTimeAgo(c.time)}</span>${window.isAdmin ? `<span style="color: #0084ff; cursor: pointer;" onclick="editComment('${postId}',${cIdx})">تعديل</span> <span style="color: #c62828; cursor: pointer;" onclick="deleteComment('${postId}',${cIdx})">حذف</span>` : ''}
                                 </div>
-                                ${showRepliesToggleBtn}
-                                ${repliesHtml}
+                                ${showRepliesToggleBtn}${repliesHtml}
                             </div>
                         </div>
                     `;
@@ -1402,7 +1398,7 @@
             let textEl = document.getElementById('postText');
             
             let selectEl = document.getElementById('postAuthorSelect');
-            selectEl.innerHTML = window.accounts.map(acc => `<option value="${acc.id}">${acc.name} ${acc.isVerified ? '✓' : ''}</option>`).join('');
+            selectEl.innerHTML = window.accounts.map(acc => `<option value="${acc.id}">${acc.name}${acc.isVerified ? '✓' : ''}</option>`).join('');
 
             if (postId !== null) {
                 titleEl.innerText = "تعديل المنشور";
@@ -1529,13 +1525,18 @@
             let feedEl = document.getElementById('postsFeed');
             if (!feedEl) return;
 
+            if (!window.postsLoaded) {
+                feedEl.innerHTML = `<div style="text-align: center; padding: 30px; color: #65676b; font-weight: 600;">جاري تحميل المنشورات انتظر قليلآ ...</div>`;
+                return;
+            }
+
             let displayPosts = window.posts;
             if (!window.isAdmin) {
                 displayPosts = window.posts.filter(p => !p.isLocked);
             }
 
             if (displayPosts.length === 0) {
-                feedEl.innerHTML = `<div style="text-align: center; padding: 40px; color: #65676b; font-weight: 600;">لا توجد منشورات حتى الآن.</div>`;
+                feedEl.innerHTML = ``;
                 return;
             }
 
