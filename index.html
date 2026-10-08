@@ -323,14 +323,12 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // المتغيرات والبيانات الحالية
         window.accounts = [ { id: 1, name: "Hadeel AL-Shami", avatar: "", isMain: true, isVerified: true, link: "" } ];
         window.coverImgUrl = "";
         window.bioText = " .....<br>";
         window.activeStory = { mediaUrl: "", mediaType: "", time: Date.now(), viewers: [] };
         window.posts = [];
 
-        // دالة الحفظ السحابي في Firebase Firestore
         window.saveDataToCloud = async function saveDataToCloud() {
             try {
                 const appData = {
@@ -347,7 +345,6 @@
             }
         };
 
-        // استماع فوري للبيانات من السحابة (Real-time Sync)
         function initCloudSync() {
             onSnapshot(doc(db, "siteData", "mainContent"), (docSnap) => {
                 if (docSnap.exists()) {
@@ -1333,7 +1330,7 @@
                     }).join('') + `</div>`;
                 }
 
-                let toggleRepliesBtn = replies.length > 0 ? `<span onclick="toggleReplies(${index})" style="color:#0084ff; font-weight:700; cursor:pointer; margin-right:10px;">${isRepliesVisible ? 'إخفاء الردود' : `عرض ${replies.length} رد`}</span>` : '';
+                let toggleRepliesBtn = replies.length > 0 ? `<span onclick="toggleReplies(${index})" style="color:#0084ff; font-weight:700; cursor:pointer;">${isRepliesVisible ? 'إخفاء الردود' : `عرض ${replies.length} رد`}</span>` : '';
 
                 return `
                     <div class="comment-item">
@@ -1345,8 +1342,11 @@
                                 ${mediaHtml}
                             </div>
                             <div class="comment-meta">
-                                <span>أعجبني</span> · <span onclick="setReplyTarget(${index}, '${author.name}')">رد</span> · <span>${getTimeAgo(c.time)}</span> ${toggleRepliesBtn}
+                                <span>أعجبني</span> · <span onclick="setReplyTarget(${index}, '${author.name}')">رد</span> · <span>${getTimeAgo(c.time)}</span>
                                 ${isAdmin ? `<span onclick="deleteComment(${index})" style="color:red; margin-right:10px;"><i class="fa-solid fa-trash"></i> حذف</span>` : ''}
+                            </div>
+                            <div style="margin-top: 4px; padding-right: 10px; font-size: 13px;">
+                                ${toggleRepliesBtn}
                             </div>
                             ${repliesHtml}
                         </div>
@@ -1354,7 +1354,6 @@
                 `;
             }).join('');
 
-            // تعديل واجهة التعليقات لتقتصر على تسجيل الدخول للأدمن فقط
             if (isAdmin) {
                 footer.innerHTML = `
                     ${currentReplyCommentIndex !== null ? `<div style="font-size:12px; color:#0084ff; display:flex; justify-content:space-between; align-items:center;"><span>جاري الرد على تعليق...</span><span style="cursor:pointer; font-weight:700;" onclick="cancelReplyTarget()">✕ إلغاء الرد</span></div>` : ''}
@@ -1374,7 +1373,6 @@
             } else {
                 footer.innerHTML = `
                     <div style="text-align: center; padding: 10px; color: #65676b; font-size: 14px; font-weight: 600; background: #f0f2f5; border-radius: 8px;">
-                       
                     </div>
                 `;
             }
@@ -1492,7 +1490,6 @@
         }
         window.closeCommentsModal = closeCommentsModal;
 
-        // تشغيل المزامنة السحابية عند فتح الصفحة
         window.onload = function() {
             initCloudSync();
         };
