@@ -1509,96 +1509,87 @@
                     isLocked: isLocked
                 };
                 await addDoc(collection(db, "posts"), newPost);
-                alert("تم نشر المنشور في السحابة بنجاح!");
+                alert("تم نشر المنشور بنجاح في السحابة!");
             }
 
+            document.getElementById('postText').value = "";
             tempFiles = [];
+            document.getElementById('filePreview').innerText = "";
+            closePostModal();
             renderFeed();
-            window.history.back();
-        }
+        };
 
         function renderFeed() {
             let feedEl = document.getElementById('postsFeed');
             if (!feedEl) return;
-
             if (!window.postsLoaded) {
                 feedEl.innerHTML = `<div style="text-align: center; padding: 30px; color: #65676b; font-weight: 600;">جاري تحميل المنشورات انتظر قليلآ ...</div>`;
                 return;
             }
 
-            let displayPosts = window.posts;
-            if (!window.isAdmin) {
-                displayPosts = window.posts.filter(p => !p.isLocked);
-            }
+            let filteredPosts = window.posts.filter(p => {
+                if (p.isLocked && !window.isAdmin) return false;
+                return true;
+            });
 
-            if (displayPosts.length === 0) {
-                feedEl.innerHTML = ``;
+            if (filteredPosts.length === 0) {
+                feedEl.innerHTML = `<div style="text-align: center; padding: 40px; color: #65676b; font-weight: 600;">لا توجد منشورات حالياً.</div>`;
                 return;
             }
 
-            feedEl.innerHTML = displayPosts.map((post) => {
-                let author = window.accounts.find(a => a.id === post.authorId) || window.accounts[0];
-                let authorName = author ? author.name : "Hadeel Al-shami";
-                let verifiedHtml = getVerifiedBadgeHtml(author);
-                let avatarUrl = author ? author.avatar : "";
-
+            feedEl.innerHTML = filteredPosts.map(p => {
+                let author = window.accounts.find(a => a.id === p.authorId) || window.accounts[0];
                 let mediaHtml = "";
-                if (post.files && post.files.length > 0) {
-                    let countClass = post.files.length === 2 ? "count-2" : "count-1";
-                    let itemsHtml = post.files.map(f => {
+                let files = p.files || (p.imgUrl ? [{ url: p.imgUrl, type: p.mediaType || 'image' }] : []);
+
+                if (files.length > 0) {
+                    let countClass = files.length === 1 ? "count-1" : "count-2";
+                    let itemsHtml = files.map(f => {
                         if (f.type === 'video') {
-                            return `<div style="position: relative; background: #000; cursor: pointer;" onclick="openVideoViewer('${f.url}', ${post.authorId}, '${post.reactions || 5}', '${post.commentsCount}', '${post.id}', '${post.reactionType || '😆'}')">
-                                <video src="${f.url}" style="width: 100%; height: 100%; object-fit: cover; display: block;" preload="metadata" muted></video>
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.6); color: #fff; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px;"><i class="fa-solid fa-play"></i></div>
-                            </div>`;
+                            return `<video src="${f.url}" style="width:100%; cursor:pointer; background:#000;" onclick="openVideoViewer('${f.url}', ${p.authorId}, '${p.reactions}', '${p.commentsCount}', '${p.id}', '${p.reactionType || '😆'}')" controlslist="nodownload noplaybackrate" disablepictureinpicture oncontextmenu="return false;"></video>`;
                         } else {
-                            return `<div><img src="${f.url}" onclick="openImageViewer('${f.url}')"></div>`;
+                            return `<img src="${f.url}" onclick="openImageViewer('${f.url}')">`;
                         }
                     }).join('');
                     mediaHtml = `<div class="post-media-grid ${countClass}">${itemsHtml}</div>`;
                 }
 
-                let lockedBadge = post.isLocked ? `<span style="background: #ffebee; color: #c62828; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-right: 5px;">🔒 منشور مقفل</span>` : '';
-
-                let adminControlsHtml = window.isAdmin ? `
-                    <div style="background: #f7f8f9; padding: 8px 16px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #eee; font-size: 13px; font-weight: 700;">
-                        <span style="color: #0084ff; cursor: pointer;" onclick="openPostModal('${post.id}')"><i class="fa-solid fa-pen"></i> تعديل</span>
-                        <span style="color: #c62828; cursor: pointer;" onclick="deletePost('${post.firestoreId}')"><i class="fa-solid fa-trash"></i> حذف</span>
-                    </div>
-                ` : '';
+                let lockedBadge = p.isLocked ? `<div style="background: #ffebee; color: #c62828; font-size: 12px; padding: 4px 10px; font-weight: 700; text-align: center; border-bottom: 1px solid #ffcdd2;"><i class="fa-solid fa-lock"></i> منشور مقفل (لا يراه سوى الأدمن)</div>` : '';
 
                 return `
-                    <div class="post-card ${post.isLocked ? 'locked-post' : ''}">
+                    <div class="post-card ${p.isLocked ? 'locked-post' : ''}">
+                        ${lockedBadge}
                         <div class="post-header">
-                            <div class="post-user-area" onclick="handleAccountClick(${post.authorId || 1})">
+                            <div class="post-user-area" onclick="handleAccountClick(${author.id})">
                                 <div style="width: 40px; height: 40px; border-radius: 50%; overflow: hidden; background: #e4e6eb; display: flex; align-items: center; justify-content: center;">
-                                    ${avatarUrl ? `<img src="${avatarUrl}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="fa-solid fa-user" style="font-size: 20px; color: #8a8d91;"></i>`}
+                                    ${author.avatar ? `<img src="${author.avatar}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i class="fa-solid fa-user" style="font-size: 20px; color: #8a8d91;"></i>`}
                                 </div>
                                 <div>
                                     <div class="post-info">
-                                        <span>${authorName}</span>
-                                        ${verifiedHtml}
-                                        ${lockedBadge}
+                                        <span>${author.name}</span>
+                                        ${getVerifiedBadgeHtml(author)}
                                     </div>
-                                    <div class="post-time">${getTimeAgo(post.time)} · <i class="fa-solid fa-globe globe-icon"></i></div>
+                                    <div class="post-time">${getTimeAgo(p.time)} · <i class="fa-solid fa-globe globe-icon"></i></div>
                                 </div>
                             </div>
-                            <i class="fa-solid fa-ellipsis" style="color: #65676b; cursor: pointer;"></i>
+                            ${window.isAdmin ? `
+                                <div style="display: flex; gap: 10px;">
+                                    <i class="fa-solid fa-pen-to-square" style="color: #0084ff; cursor: pointer; font-size: 16px;" onclick="openPostModal('${p.id}')" title="تعديل المنشور"></i>
+                                    <i class="fa-solid fa-trash" style="color: #c62828; cursor: pointer; font-size: 16px;" onclick="deletePost('${p.firestoreId}')" title="حذف المنشور"></i>
+                                </div>
+                            ` : ''}
                         </div>
-                        <div class="post-body">
-                            ${linkify(post.text)}
-                        </div>
+                        <div class="post-body">${linkify(p.text || "")}</div>
                         ${mediaHtml}
                         <div class="post-stats">
-                            ${renderReactionsHtml(post.reactions, post.reactionType)}
-                            <span class="clickable-comments" onclick="openComments('${post.id}')">${post.commentsCount || '0 تعليق'}</span>
+                            ${renderReactionsHtml(p.reactions, p.reactionType)}
+                            <span class="clickable-comments" onclick="openComments('${p.id}')">${p.commentsCount || "0 تعليق"}</span>
                         </div>
                         <div class="post-actions-bar">
                             <div class="post-action-btn"><i class="fa-regular fa-thumbs-up"></i> أعجبني</div>
-                            <div class="post-action-btn" onclick="openComments('${post.id}')"><i class="fa-regular fa-comment"></i> تعليق</div>
+                            <div class="post-action-btn" onclick="openComments('${p.id}')"><i class="fa-regular fa-comment"></i> تعليق</div>
                             <div class="post-action-btn"><i class="fa-solid fa-share"></i> مشاركة</div>
                         </div>
-                        ${adminControlsHtml}
                     </div>
                 `;
             }).join('');
