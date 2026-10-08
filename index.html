@@ -1311,9 +1311,8 @@
                 `;
             } else {
                 modalFooter.innerHTML = `
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                        <input type="text" id="commentInputText" placeholder="اكتب تعليقاً..." style="flex: 1; padding: 10px 14px; border-radius: 20px; border: 1px solid #ccd0d5; outline: none; font-size: 14px; background: #f0f2f5; font-weight: 500;">
-                        <button onclick="submitComment('${postId}')" style="background: #0084ff; color: #fff; border: none; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px;"><i class="fa-solid fa-paper-plane"></i></button>
+                    <div style="text-align: center; padding: 10px; font-size: 14px; color: #65676b; font-weight: 700; background: #f0f2f5; border-radius: 8px;">
+                        
                     </div>
                 `;
             }
@@ -1340,6 +1339,7 @@
         }
 
         window.submitComment = async function(postId) {
+            if (!window.isAdmin) return;
             let inputEl = document.getElementById('commentInputText');
             if (!inputEl) return;
             let text = inputEl.value.trim();
@@ -1349,7 +1349,7 @@
             if (!post) return;
             if (!post.comments) post.comments = [];
 
-            if (window.isAdmin && window.currentReplyCommentIndex !== null) {
+            if (window.currentReplyCommentIndex !== null) {
                 let cIdx = window.currentReplyCommentIndex;
                 if (!post.comments[cIdx].replies) post.comments[cIdx].replies = [];
                 post.comments[cIdx].replies.push({
@@ -1363,15 +1363,11 @@
                 });
                 window.currentReplyCommentIndex = null;
             } else {
-                let commentAuthorName = window.isAdmin ? window.fakeUser.name : "زائر";
-                let commentAuthorAvatar = window.isAdmin ? window.fakeUser.avatar : "";
-                let commentIsVerified = window.isAdmin ? window.fakeUser.isVerified : false;
-
                 post.comments.push({
                     text: text,
-                    name: commentAuthorName,
-                    avatar: commentAuthorAvatar,
-                    isVerified: commentIsVerified,
+                    name: window.fakeUser.name,
+                    avatar: window.fakeUser.avatar,
+                    isVerified: window.fakeUser.isVerified,
                     fileUrl: commentTempFile.url,
                     fileType: commentTempFile.type,
                     time: Date.now(),
