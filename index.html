@@ -1094,7 +1094,7 @@
 
         function openPostModal(postId = null) {
             if (!isAdmin) {
-                alert("يجب تسجيل دخول الأدمن أولاً للنشر!");
+                alert("_");
                 return;
             }
             currentEditingPostId = postId !== null ? String(postId) : null;
@@ -1259,7 +1259,7 @@
             if (!post.comments) post.comments = [];
 
             modalBody.innerHTML = post.comments.length === 0 ? 
-                `<p style="text-align:center; color:#65676b; padding:20px; font-weight:600;">لا توجد تعليقات بعد. كن أول المعلقين!</p>` : 
+                `<p style="text-align:center; color:#65676b; padding:20px; font-weight:600;">لا توجد تعليقات بعد.</p>` : 
                 post.comments.map((c, cIdx) => {
                     let cAuthor = window.accounts.find(a => a.id === c.authorId) || { name: c.authorName || "زائر", avatar: c.avatar || "", isVerified: false };
                     let cAvatarHtml = cAuthor.avatar ? `<img src="${cAuthor.avatar}" class="comment-avatar">` : `<div class="comment-avatar" style="background:#e4e6eb; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-user" style="font-size:16px; color:#8a8d91;"></i></div>`;
@@ -1328,27 +1328,30 @@
                     `;
                 }).join('');
 
-            let replyIndicator = currentReplyCommentIndex !== null ? `
-                <div style="background:#e7f3ff; padding:6px 10px; border-radius:6px; font-size:12px; display:flex; justify-content:space-between; align-items:center;">
-                    <span>جارٍ الرد على التعليق رقم #${currentReplyCommentIndex + 1}</span>
-                    <span style="cursor:pointer; color:red; font-weight:700;" onclick="cancelReply()">✕ إلغاء</span>
-                </div>
-            ` : '';
+            // إخفاء خانة ووسائل كتابة التعليقات بالكامل إذا لم يكن المستخدم مسجلاً دخول كأدمن
+            if (!isAdmin) {
+                modalFooter.innerHTML = `<div style="text-align: center; color: #65676b; font-size: 13px; font-weight: 600; padding: 4px;">يجب تسجيل دخول الأدمن لكتابة التعليقات</div>`;
+            } else {
+                let replyIndicator = currentReplyCommentIndex !== null ? `
+                    <div style="background:#e7f3ff; padding:6px 10px; border-radius:6px; font-size:12px; display:flex; justify-content:space-between; align-items:center;">
+                        <span>جارٍ الرد على التعليق رقم #${currentReplyCommentIndex + 1}</span>
+                        <span style="cursor:pointer; color:red; font-weight:700;" onclick="cancelReply()">✕ إلغاء</span>
+                    </div>
+                ` : '';
 
-            modalFooter.innerHTML = `
-                ${replyIndicator}
-                <div id="commentFilePreview" style="font-size:12px; color:green;"></div>
-                <div style="display:flex; gap:8px; align-items:center;">
-                    ${isAdmin ? `
+                modalFooter.innerHTML = `
+                    ${replyIndicator}
+                    <div id="commentFilePreview" style="font-size:12px; color:green;"></div>
+                    <div style="display:flex; gap:8px; align-items:center;">
                         <select id="commentAuthorSelect" style="padding:8px; border-radius:6px; border:1px solid #ccc; font-size:13px; font-weight:600;">
                             ${window.accounts.map(acc => `<option value="${acc.id}">${acc.name}</option>`).join('')}
                         </select>
-                    ` : ''}
-                    <textarea id="commentInputText" placeholder="اكتب تعليقاً..." style="flex:1; padding:8px 12px; border:1px solid #ccc; border-radius:20px; outline:none; resize:none; font-size:14px; max-height:80px;"></textarea>
-                    <i class="fa-solid fa-camera" style="font-size:20px; color:#0084ff; cursor:pointer;" onclick="document.getElementById('commentFilePicker').click()" title="إرفاق صورة أو فيديو"></i>
-                    <button onclick="submitComment('${postId}')" style="background:#0084ff; color:#fff; border:none; padding:8px 14px; border-radius:20px; font-weight:700; cursor:pointer;">إرسال</button>
-                </div>
-            `;
+                        <textarea id="commentInputText" placeholder="اكتب تعليقاً..." style="flex:1; padding:8px 12px; border:1px solid #ccc; border-radius:20px; outline:none; resize:none; font-size:14px; max-height:80px;"></textarea>
+                        <i class="fa-solid fa-camera" style="font-size:20px; color:#0084ff; cursor:pointer;" onclick="document.getElementById('commentFilePicker').click()" title="إرفاق صورة أو فيديو"></i>
+                        <button onclick="submitComment('${postId}')" style="background:#0084ff; color:#fff; border:none; padding:8px 14px; border-radius:20px; font-weight:700; cursor:pointer;">إرسال</button>
+                    </div>
+                `;
+            }
 
             let modal = document.getElementById('commentsModal');
             if (modal.style.display !== 'flex') {
@@ -1365,8 +1368,9 @@
         window.closeCommentsModal = closeCommentsModal;
 
         function submitComment(postId) {
+            if (!isAdmin) return;
             let textEl = document.getElementById('commentInputText');
-            let text = textEl.value.trim();
+            let text = textEl ? textEl.value.trim() : "";
             if (!text && !commentTempFile.url) {
                 alert("يرجى كتابة تعليق أو إرفاق ملف.");
                 return;
@@ -1375,10 +1379,8 @@
             if (!post) return;
 
             let authorId = 1;
-            if (isAdmin) {
-                let authorSelect = document.getElementById('commentAuthorSelect');
-                if (authorSelect) authorId = parseInt(authorSelect.value);
-            }
+            let authorSelect = document.getElementById('commentAuthorSelect');
+            if (authorSelect) authorId = parseInt(authorSelect.value);
 
             if (currentReplyCommentIndex !== null) {
                 if (!post.comments[currentReplyCommentIndex].replies) post.comments[currentReplyCommentIndex].replies = [];
@@ -1407,6 +1409,14 @@
             renderFeed();
         }
         window.submitComment = submitComment;
+
+        function updateCommentsCount(post) {
+            let total = post.comments.length;
+            post.comments.forEach(c => {
+                if (c.replies) total += c.replies.length;
+            });
+            post.commentsCount = total + " تعليقات";
+        }
     </script>
 
     <!-- Firebase SDK Scripts -->
