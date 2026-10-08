@@ -50,6 +50,14 @@
         .post-time { font-size: 12px; color: #65676b; font-weight: 500; }
         .globe-icon { color: #65676b; filter: grayscale(100%); font-size: 11px; vertical-align: middle; }
         .post-body { padding: 0 16px 12px; font-size: 16px; line-height: 1.5; color: #050505; word-break: break-word; font-weight: 500; }
+        
+        /* تنسيق شبكة الصور داخل المنشور */
+        .post-media-grid { display: grid; gap: 2px; margin-top: 10px; background: #fff; width: 100%; }
+        .post-media-grid.count-1 { grid-template-columns: 1fr; }
+        .post-media-grid.count-2 { grid-template-columns: 1fr 1fr; }
+        .post-media-grid img, .post-media-grid video { width: 100%; height: 100%; object-fit: cover; display: block; cursor: pointer; max-height: 450px; }
+        .post-media-grid.count-2 img, .post-media-grid.count-2 video { height: 350px; }
+
         .post-stats { display: flex; justify-content: space-between; padding: 10px 16px; font-size: 13px; color: #65676b; border-bottom: 1px solid #eee; font-weight: 600; align-items: center; }
         .post-stats span.clickable-comments:hover { text-decoration: underline; color: #0084ff; }
         .post-actions-bar { display: flex; justify-content: space-around; padding: 4px 0; }
@@ -359,12 +367,10 @@
         window.activeStory = { mediaUrl: "", mediaType: "", time: Date.now(), viewers: [] };
         window.posts = [];
 
-        // --- Cloud Sync Functions (Firebase Firestore) - فصل المكتبات لتوفير المساحة ---
         const siteDocRef = doc(db, "siteData", "mainSite");
 
         window.saveDataCloud = async function() {
             try {
-                // حفظ البيانات العامة والأساسية فقط في الملف الرئيسي لتوفير المساحة الحادة
                 await setDoc(siteDocRef, {
                     accounts: window.accounts,
                     coverImgUrl: window.coverImgUrl,
@@ -389,7 +395,6 @@
                     await window.saveDataCloud();
                 }
 
-                // جلب القصة النشطة من مكتبة منفصلة (stories) لتوفير المساحة
                 const storySnap = await getDocs(collection(db, "stories"));
                 if (!storySnap.empty) {
                     window.activeStory = storySnap.docs[0].data();
@@ -401,7 +406,6 @@
             initUI();
         }
 
-        // Realtime listener for posts (مكتبة المنشورات المستقلة تماماً)
         function listenToPosts() {
             onSnapshot(collection(db, "posts"), (snapshot) => {
                 let loadedPosts = [];
@@ -738,7 +742,6 @@
             }
         }
 
-        // --- إدارة حفظ وقراءة القصص في مجموعة منفصلة لتوفير المساحة ---
         window.handleStoryFileSelect = async function(e) {
             const file = e.target.files[0];
             if (file) {
@@ -1513,7 +1516,6 @@
                     viewers: [],
                     isLocked: isLocked
                 };
-                // يتم حفظ كل منشور في مستند مستقل داخل مجموعة (posts) لتوفير المساحة وتفادي حدود حجم المستند
                 await addDoc(collection(db, "posts"), newPost);
                 alert("تم نشر المنشور في السحابة بنجاح!");
             }
@@ -1545,16 +1547,18 @@
 
                 let mediaHtml = "";
                 if (post.files && post.files.length > 0) {
-                    mediaHtml = post.files.map(f => {
+                    let countClass = post.files.length === 2 ? "count-2" : "count-1";
+                    let itemsHtml = post.files.map(f => {
                         if (f.type === 'video') {
-                            return `<div style="margin-top: 10px; position: relative; background: #000; cursor: pointer;" onclick="openVideoViewer('${f.url}', ${post.authorId}, '${post.reactions || 5}', '${post.commentsCount}', '${post.id}', '${post.reactionType || '😆'}')">
-                                <video src="${f.url}" style="width: 100%; max-height: 450px; object-fit: contain; display: block;" preload="metadata" muted></video>
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.6); color: #fff; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px;"><i class="fa-solid fa-play"></i></div>
+                            return `<div style="position: relative; background: #000; cursor: pointer;" onclick="openVideoViewer('${f.url}', ${post.authorId}, '${post.reactions || 5}', '${post.commentsCount}', '${post.id}', '${post.reactionType || '😆'}')">
+                                <video src="${f.url}" style="width: 100%; height: 100%; object-fit: cover; display: block;" preload="metadata" muted></video>
+                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.6); color: #fff; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px;"><i class="fa-solid fa-play"></i></div>
                             </div>`;
                         } else {
-                            return `<div style="margin-top: 10px; background: #f0f2f5;"><img src="${f.url}" style="width: 100%; max-height: 500px; object-fit: cover; display: block; cursor: pointer;" onclick="openImageViewer('${f.url}')"></div>`;
+                            return `<div><img src="${f.url}" onclick="openImageViewer('${f.url}')"></div>`;
                         }
                     }).join('');
+                    mediaHtml = `<div class="post-media-grid ${countClass}">${itemsHtml}</div>`;
                 }
 
                 let lockedBadge = post.isLocked ? `<span style="background: #ffebee; color: #c62828; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-right: 5px;">🔒 منشور مقفل</span>` : '';
@@ -1603,7 +1607,6 @@
             }).join('');
         }
 
-        // بدء تشغيل التطبيق وتحميل البيانات من السحابة عند الفتح
         loadDataCloud();
     </script>
 </body>
