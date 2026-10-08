@@ -314,7 +314,7 @@
 
     <!-- Script Application Logic -->
     <script>
-        // --- إعدادات وتكوين Firebase (ضع بيانات مشروعتك هنا عند التفعيل) ---
+        // --- إعدادات وتكوين Firebase ---
         const firebaseConfig = {
             apiKey: "YOUR_API_KEY",
             authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
@@ -327,7 +327,7 @@
         let db = null;
         let storage = null;
 
-        // تهيئة تطبيق Firebase فقط في حال تغيير المعرف الافتراضي
+        // تهيئة تطبيق Firebase
         try {
             if (firebaseConfig.projectId && firebaseConfig.projectId !== "YOUR_PROJECT_ID") {
                 if (!firebase.apps.length) {
@@ -429,6 +429,7 @@
         }
         window.initCloudSyncUI = initCloudSyncUI;
 
+        // دالة الرفع السحابي الرئيسية
         async function uploadFileToFirebase(file, path) {
             if (!storage) throw new Error("Firebase storage not initialized");
             const storageRef = storage.ref(`${path}/${Date.now()}_${file.name || 'file'}`);
@@ -627,7 +628,7 @@
                     try {
                         uploadedUrl = await uploadFileToFirebase(dataURLtoFile(base64Url, file.name), "avatars");
                     } catch(e) {
-                        console.warn("استخدام التخزين المحلي");
+                        console.warn("استخدام التخزين المحلي الاحتياطي");
                     }
                     let mainAcc = window.accounts.find(a => a.isMain);
                     if (mainAcc) {
@@ -1304,7 +1305,7 @@
                     alert("يمكنك إرفاق بحد أقصى 5 صور أو فيديوهات فقط لكل منشور.");
                     return;
                 }
-                document.getElementById('filePreview').innerText = "جاري معالجة الصور إلكترونياً...";
+                document.getElementById('filePreview').innerText = "جاري رفع الصور إلى التخزين السحابي...";
                 for (let i = 0; i < files.length; i++) {
                     let file = files[i];
                     try {
@@ -1320,7 +1321,7 @@
                         console.error(err);
                     }
                 }
-                document.getElementById('filePreview').innerText = `تم إرفاق ${tempFiles.length} ملفات بنجاح.`;
+                document.getElementById('filePreview').innerText = `تم رفع وإرفاق ${tempFiles.length} ملفات بنجاح.`;
                 document.getElementById('clearPostMediaBtn').style.display = 'block';
             }
             e.target.value = "";
