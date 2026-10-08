@@ -168,7 +168,7 @@
         </div>
 
         <div id="postsFeed">
-            <div style="text-align: center; padding: 30px; color: #65676b; font-weight: 600;">جاري تحميل المنشورات انتظر قليلآ ...</div>
+            <div style="text-align: center; padding: 30px; color: #65676b; font-weight: 600;">جاري تحميل المنشورات من سحابة الفايبربيز ...</div>
         </div>
     </div>
 
@@ -319,23 +319,27 @@
     </div>
     <div class="admin-lock" onclick="handleLockClick()"></div>
 
-    <!-- Firebase SDKs & Cloud Application Logic -->
+    <!-- Firebase SDK & Application Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, addDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
-          apiKey: "AIzaSyA5RnE4NVSKuTv_NZ4U3OKPPpYLel-vJXU",
-          authDomain: "hadeel-ui.firebaseapp.com",
-          projectId: "hadeel-ui",
-          storageBucket: "hadeel-ui.firebasestorage.app",
-          messagingSenderId: "462600822817",
-          appId: "1:462600822817:web:c9e8dfc85e21659b770360",
-          measurementId: "G-5E7M46R1BD"
+          apiKey: "AIzaSyCYiZT51-dDhh9Cm-BV-sqqiyLWaPb4ysM",
+          authDomain: "ffvh-1d054.firebaseapp.com",
+          projectId: "ffvh-1d054",
+          storageBucket: "ffvh-1d054.firebasestorage.app",
+          messagingSenderId: "245787651793",
+          appId: "1:245787651793:web:4673bbd129271698d9dff0",
+          measurementId: "G-H1JVWKEDGN"
         };
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+        window.db = db;
+        window.doc = doc;
+        window.getDoc = getDoc;
+        window.setDoc = setDoc;
 
         window.history.pushState({ page: "main" }, "", window.location.href);
         window.isAdmin = false;
@@ -348,7 +352,7 @@
         let lockTimer = null;
         window.visibleRepliesMap = {};
 
-        window.fakeUser = {
+        window.fakeUser = JSON.parse(localStorage.getItem('local_fakeUser')) || {
             name: "زائر",
             avatar: "",
             isVerified: false,
@@ -367,72 +371,48 @@
         window.activeStory = { mediaUrl: "", mediaType: "", time: Date.now(), viewers: [] };
         window.posts = [];
 
-        const siteDocRef = doc(db, "siteData", "mainSite");
-
-        window.saveDataCloud = async function() {
+        // دالة حفظ البيانات في سحابة فايربيز بشكل آمن ودائم دون أي فقدان
+        window.saveDataFirebase = async function() {
             try {
-                await setDoc(siteDocRef, {
+                await setDoc(doc(db, "siteData", "mainConfig"), {
                     accounts: window.accounts,
                     coverImgUrl: window.coverImgUrl,
                     bioText: window.bioText,
-                    fakeUser: window.fakeUser
+                    activeStory: window.activeStory,
+                    posts: window.posts
                 }, { merge: true });
             } catch(err) {
-                console.error("خطأ في حفظ البيانات سحابياً: ", err);
+                console.error("خطأ في حفظ البيانات في فايربيز: ", err);
             }
         };
 
-        async function loadDataCloud() {
+        // دالة جلب البيانات الثابتة من سحابة فايربيز
+        window.loadDataFirebase = async function() {
             try {
-                const docSnap = await getDoc(siteDocRef);
+                const docSnap = await getDoc(doc(db, "siteData", "mainConfig"));
                 if (docSnap.exists()) {
                     let data = docSnap.data();
-                    window.accounts = data.accounts || window.accounts;
-                    window.coverImgUrl = data.coverImgUrl !== undefined ? data.coverImgUrl : "";
-                    window.bioText = data.bioText !== undefined ? data.bioText : " .....<br>";
-                    if (data.fakeUser) window.fakeUser = data.fakeUser;
-                } else {
-                    await window.saveDataCloud();
+                    if(data.accounts) window.accounts = data.accounts;
+                    if(data.coverImgUrl !== undefined) window.coverImgUrl = data.coverImgUrl;
+                    if(data.bioText) window.bioText = data.bioText;
+                    if(data.activeStory) window.activeStory = data.activeStory;
+                    if(data.posts && Array.isArray(data.posts)) window.posts = data.posts;
                 }
-
-                const storySnap = await getDocs(collection(db, "stories"));
-                if (!storySnap.empty) {
-                    window.activeStory = storySnap.docs[0].data();
-                    window.activeStory.firestoreId = storySnap.docs[0].id;
-                }
-            } catch (err) {
-                console.error("خطأ في جلب البيانات من السحابة: ", err);
+            } catch(err) {
+                console.error("خطأ في جلب البيانات من فايربيز: ", err);
             }
             initUI();
-        }
-
-        function listenToPosts() {
-            onSnapshot(collection(db, "posts"), (snapshot) => {
-                let loadedPosts = [];
-                snapshot.forEach((docSnap) => {
-                    loadedPosts.push({ firestoreId: docSnap.id, ...docSnap.data() });
-                });
-                loadedPosts.sort((a, b) => b.time - a.time);
-                window.posts = loadedPosts;
-                window.postsLoaded = true;
-                renderFeed();
-                let commentsModalEl = document.getElementById('commentsModal');
-                if (commentsModalEl && commentsModalEl.style.display === 'flex' && window.currentPostIdForComment) {
-                    openComments(window.currentPostIdForComment);
-                }
-            }, (error) => {
-                console.error("خطأ في جلب المنشورات سحابياً: ", error);
-            });
-        }
+        };
 
         function initUI() {
+            window.postsLoaded = true;
             updateCoverDisplay();
             updateMainProfileVerificationDisplay();
             updateMainProfileNameDisplay();
             let bioEl = document.getElementById('bioTextContainer');
             if(bioEl) bioEl.innerHTML = window.bioText;
             updateStoryUI();
-            listenToPosts();
+            renderFeed();
         }
 
         function getTimeAgo(timestamp) {
@@ -605,8 +585,8 @@
             if (newBio !== null) {
                 window.bioText = newBio.trim().replace(/\n/g, "<br>");
                 bioEl.innerHTML = window.bioText;
-                await window.saveDataCloud();
-                alert("تم تحديث الوصف بنجاح وحفظه في السحابة.");
+                await window.saveDataFirebase();
+                alert("تم تحديث وحفظ الوصف في سحابة فايربيز.");
             }
         }
 
@@ -618,11 +598,11 @@
                     let mainAcc = window.accounts.find(a => a.isMain);
                     if (mainAcc) {
                         mainAcc.avatar = compressedUrl;
-                        await window.saveDataCloud();
+                        await window.saveDataFirebase();
                     }
                     updateAvatarDisplay('avatarImg', 'avatarPlaceholderIcon', compressedUrl);
                     renderFeed();
-                    alert("تم ضغط وتحديث صورة الصفحة وحفظها في السحابة بكفاءة عالية!");
+                    alert("تم تحديث صورة الصفحة وحفظها في سحابة فايربيز!");
                 } catch(err) {
                     alert("حدث خطأ أثناء تحميل وضغط الصورة.");
                 }
@@ -639,10 +619,10 @@
                     if (acc) {
                         acc.avatar = compressedUrl;
                         if (acc.isMain) updateAvatarDisplay('avatarImg', 'avatarPlaceholderIcon', compressedUrl);
-                        await window.saveDataCloud();
+                        await window.saveDataFirebase();
                     }
                     renderFeed();
-                    alert("تم ضغط وتحديث صورة الحساب بنجاح وحفظها في السحابة!");
+                    alert("تم تحديث صورة الحساب وحفظها سحابياً!");
                     targetAccountIdForAvatar = null;
                 } catch(err) {
                     alert("حدث خطأ أثناء تحميل وضغط الصورة.");
@@ -656,9 +636,9 @@
                 try {
                     let compressedUrl = await compressImage(file, 250, 250, 0.7);
                     window.fakeUser.avatar = compressedUrl;
-                    await window.saveDataCloud();
+                    localStorage.setItem('local_fakeUser', JSON.stringify(window.fakeUser));
                     if (window.currentPostIdForComment) openComments(window.currentPostIdForComment);
-                    alert("تم تحديث وحفظ صورة الحساب الوهمي في السحابة بنجاح!");
+                    alert("تم تحديث صورة الحساب الوهمي بنجاح!");
                 } catch(err) {
                     alert("حدث خطأ أثناء تحميل صورة الحساب الوهمي.");
                 }
@@ -685,20 +665,18 @@
                         let post = window.posts.find(p => String(p.id) === String(window.currentPostIdForComment));
                         if (post && post.comments[idOrIndex]) {
                             post.comments[idOrIndex].avatar = compressedUrl;
-                            await updateDoc(doc(db, "posts", post.firestoreId), { comments: post.comments });
                         }
                     } else if (type === 'reply') {
                         let post = window.posts.find(p => String(p.id) === String(window.currentPostIdForComment));
                         if (post && post.comments[idOrIndex] && post.comments[idOrIndex].replies[replyIndex]) {
                             post.comments[idOrIndex].replies[replyIndex].avatar = compressedUrl;
-                            await updateDoc(doc(db, "posts", post.firestoreId), { comments: post.comments });
                         }
                     }
                     
-                    if (type === 'fakeUser') await window.saveDataCloud();
+                    await window.saveDataFirebase();
                     if (window.currentPostIdForComment) openComments(window.currentPostIdForComment);
                     renderFeed();
-                    alert("تم تحديث وحفظ صورة الحساب في السحابة بنجاح!");
+                    alert("تم تحديث وحفظ الصورة في السحابة بنجاح!");
                     targetCommentAvatarInfo = null;
                 } catch(err) {
                     alert("حدث خطأ أثناء تحميل وضغط الصورة.");
@@ -719,10 +697,10 @@
                     let newName = prompt("أدخل الاسم الجديد:", acc.name);
                     if (newName !== null && newName.trim() !== "") {
                         acc.name = newName.trim();
-                        await window.saveDataCloud();
+                        await window.saveDataFirebase();
                         if (acc.isMain) updateMainProfileNameDisplay();
                         renderFeed();
-                        alert("تم تحديث الاسم بنجاح في السحابة.");
+                        alert("تم تحديث الاسم في السحابة بنجاح.");
                     }
                 }
             }
@@ -751,19 +729,8 @@
                     let type = file.type.startsWith('video') ? 'video' : 'image';
                     window.activeStory = { mediaUrl: base64Url, mediaType: type, time: Date.now(), viewers: [] };
                     updateStoryUI();
-
-                    const storyCol = collection(db, "stories");
-                    const storySnap = await getDocs(storyCol);
-                    if (!storySnap.empty) {
-                        let docId = storySnap.docs[0].id;
-                        await updateDoc(doc(db, "stories", docId), window.activeStory);
-                        window.activeStory.firestoreId = docId;
-                    } else {
-                        let newDocRef = await addDoc(storyCol, window.activeStory);
-                        window.activeStory.firestoreId = newDocRef.id;
-                    }
-
-                    alert("تم نشر وضغط القصة وحفظها في السحابة بنجاح!");
+                    await window.saveDataFirebase();
+                    alert("تم نشر القصة وحفظها في سحابة فايربيز بنجاح!");
                 } catch(err) {
                     alert("حدث خطأ أثناء رفع القصة.");
                 }
@@ -802,8 +769,8 @@
                 let verifyChoice = confirm("هل تريد أن يكون هذا الحساب الوهمي موثقاً (بعلامة صح زرقاء)؟\nانقر 'موافق' للتوثيق، أو 'إلغاء' لعدم التوثيق.");
                 window.fakeUser.isVerified = verifyChoice;
                 window.fakeUser.badge = "";
-                await window.saveDataCloud();
-                alert("تم تحديث إعدادات الحساب بنجاح وحفظها في السحابة!");
+                localStorage.setItem('local_fakeUser', JSON.stringify(window.fakeUser));
+                alert("تم تحديث إعدادات الحساب بنجاح!");
             }
         };
 
@@ -815,12 +782,12 @@
             if (choice !== null) {
                 let idx = parseInt(choice.trim());
                 if (idx === 0) {
-                    let subChoice = prompt(`إدارة الحساب (${window.fakeUser.name}):\n1. تغيير الاسم\n2. تغيير الصورة في السحابة\n3. تبديل حالة التوثيق`);
+                    let subChoice = prompt(`إدارة الحساب (${window.fakeUser.name}):\n1. تغيير الاسم\n2. تغيير الصورة\n3. تبديل حالة التوثيق`);
                     if (subChoice === "1") {
                         let name = prompt("أدخل الاسم الجديد:", window.fakeUser.name);
                         if (name) { 
                             window.fakeUser.name = name.trim(); 
-                            await window.saveDataCloud(); 
+                            localStorage.setItem('local_fakeUser', JSON.stringify(window.fakeUser)); 
                             openComments(window.currentPostIdForComment); 
                         }
                     } else if (subChoice === "2") {
@@ -834,7 +801,7 @@
                     window.fakeUser.avatar = selectedAcc.avatar;
                     window.fakeUser.isVerified = selectedAcc.isVerified;
                     window.fakeUser.badge = "";
-                    await window.saveDataCloud();
+                    localStorage.setItem('local_fakeUser', JSON.stringify(window.fakeUser));
                     openComments(window.currentPostIdForComment);
                 }
             }
@@ -844,10 +811,8 @@
             if (confirm("هل أنت متأكد من إزالة القصة الحالية؟")) {
                 window.activeStory = { mediaUrl: "", mediaType: "", time: Date.now(), viewers: [] };
                 updateStoryUI();
-                if (window.activeStory.firestoreId) {
-                    await deleteDoc(doc(db, "stories", window.activeStory.firestoreId));
-                }
-                alert("تمت إزالة القصة بنجاح من السحابة.");
+                await window.saveDataFirebase();
+                alert("تمت إزالة القصة من السحابة بنجاح.");
             }
         }
 
@@ -857,9 +822,7 @@
                 let existingViewer = window.activeStory.viewers.find(v => v.deviceId === currentDeviceId);
                 if (!existingViewer) {
                     window.activeStory.viewers.push({ deviceId: currentDeviceId, name: window.isAdmin ? "الأدمن (أنت)" : "زائر (" + currentDeviceId.substring(0, 8) + ")", time: Date.now(), avatar: "" });
-                    if (window.activeStory.firestoreId) {
-                        await updateDoc(doc(db, "stories", window.activeStory.firestoreId), { viewers: window.activeStory.viewers });
-                    }
+                    await window.saveDataFirebase();
                 }
                 let imgEl = document.getElementById('storyMediaImg');
                 let vidEl = document.getElementById('storyMediaVid');
@@ -1004,7 +967,7 @@
                 let existingViewer = post.viewers.find(v => v.deviceId === currentDeviceId);
                 if (!existingViewer) {
                     post.viewers.push({ deviceId: currentDeviceId, name: window.isAdmin ? "الأدمن (أنت)" : "زائر (" + currentDeviceId.substring(0, 8) + ")", time: Date.now(), avatar: "" });
-                    await updateDoc(doc(db, "posts", post.firestoreId), { viewers: post.viewers });
+                    await window.saveDataFirebase();
                 }
             }
             let author = window.accounts.find(a => a.id === authorId) || window.accounts[0];
@@ -1053,7 +1016,7 @@
                 document.getElementById('adminControls').style.display = 'flex';
                 document.getElementById('settingsGearBtn').style.display = 'block';
                 renderFeed();
-                alert("مرحباً بك يا أدمن، تم تفعيل كامل الصلاحيات.");
+                alert("مرحباً بك يا أدمن، تم تفعيل كامل الصلاحيات السحابية.");
             } else if (pass !== null) {
                 alert("كلمة المرور غير صحيحة!");
             }
@@ -1061,15 +1024,15 @@
 
         window.manageAccounts = async function() {
             let listStr = window.accounts.map((acc, index) => `${index + 1}. ${acc.name}${acc.isVerified ? '✓(موثق)' : ''}`).join('\n');
-            let choice = prompt(`إدارة الحسابات والتوثيق:\n${listStr}\n\nاختر رقماً للإجراء:\n1. إضافة حساب جديد\n2. تغيير اسم الحساب\n3. تغيير صورة حساب\n4. تبديل حالة التوثيق\n5. إعدادات حساب التعليقات`);
+            let choice = prompt(`إدارة الحسابات والتوثيق السحابي:\n${listStr}\n\nاختر رقماً للإجراء:\n1. إضافة حساب جديد\n2. تغيير اسم الحساب\n3. تغيير صورة حساب\n4. تبديل حالة التوثيق\n5. إعدادات حساب التعليقات`);
             if (choice === "1") {
                 let name = prompt("أدخل اسم الحساب الجديد:");
                 if (name && name.trim()) {
                     let newId = Date.now();
                     let verifiedConfirm = confirm("هل تريد توثيق هذا الحساب بعلامة التوثيق الزرقاء؟");
                     window.accounts.push({ id: newId, name: name.trim(), avatar: "", isMain: false, isVerified: verifiedConfirm });
-                    await window.saveDataCloud();
-                    alert("تم إضافة الحساب بنجاح في السحابة.");
+                    await window.saveDataFirebase();
+                    alert("تم إضافة الحساب وحفظه في السحابة بنجاح.");
                 }
             } else if (choice === "2") {
                 let accNum = prompt(`اختر رقم الحساب لتعديل اسمه:\n` + window.accounts.map((acc, i) => `${i + 1}:${acc.name}`).join('\n'));
@@ -1078,10 +1041,10 @@
                     let newName = prompt(`أدخل الاسم الجديد لـ (${window.accounts[idx].name}):`, window.accounts[idx].name);
                     if (newName !== null && newName.trim() !== "") {
                         window.accounts[idx].name = newName.trim();
-                        await window.saveDataCloud();
+                        await window.saveDataFirebase();
                         if (window.accounts[idx].isMain) updateMainProfileNameDisplay();
                         renderFeed();
-                        alert("تم تغيير اسم الحساب بنجاح في السحابة!");
+                        alert("تم تغيير اسم الحساب وحفظه سحابياً!");
                     }
                 }
             } else if (choice === "3") {
@@ -1096,10 +1059,10 @@
                 let idx = parseInt(accNum) - 1;
                 if (!isNaN(idx) && window.accounts[idx]) {
                     window.accounts[idx].isVerified = !window.accounts[idx].isVerified;
-                    await window.saveDataCloud();
+                    await window.saveDataFirebase();
                     updateMainProfileVerificationDisplay();
                     renderFeed();
-                    alert("تم تغيير حالة التوثيق بنجاح في السحابة.");
+                    alert("تم تغيير حالة التوثيق وحفظها سحابياً.");
                 }
             } else if (choice === "5") {
                 configureFakeUser();
@@ -1113,8 +1076,8 @@
             else if (choice === "2") {
                 window.coverImgUrl = "";
                 updateCoverDisplay();
-                window.saveDataCloud();
-                alert("تمت إزالة الغلاف بنجاح في السحابة!");
+                window.saveDataFirebase();
+                alert("تمت إزالة الغلاف من السحابة بنجاح!");
             }
         }
 
@@ -1124,8 +1087,8 @@
                 try {
                     window.coverImgUrl = await compressImage(file, 900, 450, 0.65);
                     updateCoverDisplay();
-                    await window.saveDataCloud();
-                    alert("تم ضغط وتحديث غلاف الصفحة وحفظه في السحابة بكفاءة!");
+                    await window.saveDataFirebase();
+                    alert("تم تحديث غلاف الصفحة وحفظه سحابياً بنجاح!");
                 } catch(err) {
                     alert("حدث خطأ أثناء رفع صورة الغلاف.");
                 }
@@ -1137,11 +1100,13 @@
             window.manageAccounts();
         }
 
-        window.deletePost = async function(firestoreId) {
+        window.deletePost = async function(id) {
             if(confirm("هل أنت متأكد من حذف هذا المنشور؟")) {
                 try {
-                    await deleteDoc(doc(db, "posts", firestoreId));
-                    alert("تم حذف المنشور بنجاح من السحابة.");
+                    window.posts = window.posts.filter(p => String(p.id) !== String(id));
+                    await window.saveDataFirebase();
+                    renderFeed();
+                    alert("تم حذف المنشور من السحابة بنجاح.");
                 } catch(err) {
                     alert("حدث خطأ أثناء الحذف.");
                 }
@@ -1155,7 +1120,7 @@
                 let newText = prompt("تعديل نص التعليق:", post.comments[commentIndex].text);
                 if (newText !== null) {
                     post.comments[commentIndex].text = newText.trim();
-                    await updateDoc(doc(db, "posts", post.firestoreId), { comments: post.comments });
+                    await window.saveDataFirebase();
                     openComments(postId);
                     renderFeed();
                 }
@@ -1169,7 +1134,7 @@
                 let newText = prompt("تعديل نص الرد:", post.comments[commentIndex].replies[replyIndex].text);
                 if (newText !== null) {
                     post.comments[commentIndex].replies[replyIndex].text = newText.trim();
-                    await updateDoc(doc(db, "posts", post.firestoreId), { comments: post.comments });
+                    await window.saveDataFirebase();
                     openComments(postId);
                     renderFeed();
                 }
@@ -1182,7 +1147,7 @@
                 if (post) {
                     post.comments.splice(commentIndex, 1);
                     updateCommentsCount(post);
-                    await updateDoc(doc(db, "posts", post.firestoreId), { comments: post.comments, commentsCount: post.commentsCount });
+                    await window.saveDataFirebase();
                     openComments(postId);
                     renderFeed();
                 }
@@ -1195,7 +1160,7 @@
                 if (post && post.comments[commentIndex] && post.comments[commentIndex].replies) {
                     post.comments[commentIndex].replies.splice(replyIndex, 1);
                     updateCommentsCount(post);
-                    await updateDoc(doc(db, "posts", post.firestoreId), { comments: post.comments, commentsCount: post.commentsCount });
+                    await window.saveDataFirebase();
                     openComments(postId);
                     renderFeed();
                 }
@@ -1264,7 +1229,6 @@
                         }).join('');
                     }
 
-                    // التعديل هنا: زر عرض الردود أصبح باللون الأزرق وبحجم أكبر وواضح (Facebook Style)
                     let showRepliesToggleBtn = repliesList.length > 0 ? `
                         <div style="font-size: 14px; color: #0084ff; font-weight: 700; margin-top: 6px; padding-right: 10px; cursor: pointer; display: flex; align-items: center; gap: 6px;" onclick="toggleReplies('${postId}',${cIdx})">
                             <i class="fa-solid fa-share fa-rotate-180" style="font-size: 11px;"></i> ${isRepliesVisible ? 'إخفاء الردود' : `عرض ${repliesList.length} من الردود`}
@@ -1312,9 +1276,7 @@
                 `;
             } else {
                 modalFooter.innerHTML = `
-                    <div style="text-align: center; padding: 10px; font-size: 14px; color: #65676b; font-weight: 700; background: #f0f2f5; border-radius: 8px;">
-                        
-                    </div>
+                    <div style="text-align: center; padding: 10px; font-size: 14px; color: #65676b; font-weight: 700; background: #f0f2f5; border-radius: 8px;"></div>
                 `;
             }
 
@@ -1378,7 +1340,7 @@
 
             commentTempFile = { url: "", type: "none" };
             updateCommentsCount(post);
-            await updateDoc(doc(db, "posts", post.firestoreId), { comments: post.comments, commentsCount: post.commentsCount });
+            await window.saveDataFirebase();
             openComments(postId);
             renderFeed();
         }
@@ -1481,20 +1443,17 @@
             if (window.currentEditingPostId !== null) {
                 let post = window.posts.find(p => String(p.id) === String(window.currentEditingPostId));
                 if (post) {
-                    let updatedData = {
-                        text: text,
-                        authorId: authorId,
-                        reactionType: reactionType,
-                        reactions: reactionsCount,
-                        isLocked: isLocked
-                    };
+                    post.text = text;
+                    post.authorId = authorId;
+                    post.reactionType = reactionType;
+                    post.reactions = reactionsCount;
+                    post.isLocked = isLocked;
                     if (tempFiles.length > 0) {
-                        updatedData.files = tempFiles;
+                        post.files = tempFiles;
                     }
-                    await updateDoc(doc(db, "posts", post.firestoreId), updatedData);
                 }
                 window.currentEditingPostId = null;
-                alert("تم تحديث المنشور بنجاح في السحابة!");
+                alert("تم تحديث المنشور في السحابة بنجاح!");
             } else {
                 let newPost = {
                     id: Date.now(),
@@ -1509,10 +1468,11 @@
                     viewers: [],
                     isLocked: isLocked
                 };
-                await addDoc(collection(db, "posts"), newPost);
-                alert("تم نشر المنشور بنجاح في السحابة!");
+                window.posts.unshift(newPost);
+                alert("تم نشر المنشور وحفظه في سحابة فايربيز بنجاح!");
             }
 
+            await window.saveDataFirebase();
             document.getElementById('postText').value = "";
             tempFiles = [];
             document.getElementById('filePreview').innerText = "";
@@ -1524,7 +1484,7 @@
             let feedEl = document.getElementById('postsFeed');
             if (!feedEl) return;
             if (!window.postsLoaded) {
-                feedEl.innerHTML = `<div style="text-align: center; padding: 30px; color: #65676b; font-weight: 600;">جاري تحميل المنشورات انتظر قليلآ ...</div>`;
+                feedEl.innerHTML = `<div style="text-align: center; padding: 30px; color: #65676b; font-weight: 600;">جاري تحميل المنشورات ...</div>`;
                 return;
             }
 
@@ -1576,7 +1536,7 @@
                             ${window.isAdmin ? `
                                 <div style="display: flex; gap: 10px;">
                                     <i class="fa-solid fa-pen-to-square" style="color: #0084ff; cursor: pointer; font-size: 16px;" onclick="openPostModal('${p.id}')" title="تعديل المنشور"></i>
-                                    <i class="fa-solid fa-trash" style="color: #c62828; cursor: pointer; font-size: 16px;" onclick="deletePost('${p.firestoreId}')" title="حذف المنشور"></i>
+                                    <i class="fa-solid fa-trash" style="color: #c62828; cursor: pointer; font-size: 16px;" onclick="deletePost('${p.id}')" title="حذف المنشور"></i>
                                 </div>
                             ` : ''}
                         </div>
@@ -1596,7 +1556,8 @@
             }).join('');
         }
 
-        loadDataCloud();
+        // بدء جلب البيانات عند تشغيل الصفحة
+        window.loadDataFirebase();
     </script>
 </body>
 </html>
