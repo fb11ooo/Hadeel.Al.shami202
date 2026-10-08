@@ -1247,7 +1247,6 @@
         }
         window.publishPost = publishPost;
 
-        // دوال إدارة الردود وإظهارها بنجاح
         function toggleReplies(postId, cIdx) {
             let key = `${postId}_${cIdx}`;
             visibleRepliesMap[key] = !visibleRepliesMap[key];
@@ -1515,10 +1514,10 @@
         }
     </script>
 
-    <!-- Firebase SDK Scripts -->
+    <!-- Firebase SDK Scripts with DOMContentLoaded and onSnapshot -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDHOX6swPGg0vuDOpl92BG8JAxP7F1o_dM",
@@ -1536,27 +1535,6 @@
         window.db = db;
         window.docRef = doc(db, "siteData", "mainDoc");
 
-        window.loadCloudData = async function() {
-            try {
-                const snap = await getDoc(window.docRef);
-                if (snap.exists()) {
-                    let data = snap.data();
-                    window.accounts = data.accounts || window.accounts;
-                    window.coverImgUrl = data.coverImgUrl || "";
-                    window.bioText = data.bioText || " .....<br>";
-                    window.activeStory = data.activeStory || { mediaUrl: "", mediaType: "", time: Date.now(), viewers: [] };
-                    window.posts = data.posts || [];
-                } else {
-                    await window.saveCloudData();
-                }
-            } catch (err) {
-                console.error("خطأ في جلب البيانات من السحابة:", err);
-            }
-            if (typeof window.initCloudSyncUI === 'function') {
-                window.initCloudSyncUI();
-            }
-        };
-
         window.saveCloudData = async function() {
             try {
                 await setDoc(window.docRef, {
@@ -1572,7 +1550,26 @@
             }
         };
 
-        window.loadCloudData();
+        // استدعاء جلب واستماع البيانات داخل حدث تحميل الصفحة DOMContentLoaded باستخدام onSnapshot
+        document.addEventListener("DOMContentLoaded", () => {
+            onSnapshot(window.docRef, async (snap) => {
+                if (snap.exists()) {
+                    let data = snap.data();
+                    window.accounts = data.accounts || window.accounts;
+                    window.coverImgUrl = data.coverImgUrl || "";
+                    window.bioText = data.bioText || " .....<br>";
+                    window.activeStory = data.activeStory || { mediaUrl: "", mediaType: "", time: Date.now(), viewers: [] };
+                    window.posts = data.posts || [];
+                } else {
+                    await window.saveCloudData();
+                }
+                if (typeof window.initCloudSyncUI === 'function') {
+                    window.initCloudSyncUI();
+                }
+            }, (error) => {
+                console.error("خطأ في جلب أو الاستماع للتحديثات السحابية:", error);
+            });
+        });
     </script>
 </body>
 </html>
