@@ -19,7 +19,6 @@
     <!-- Firebase SDK Compat Scripts -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-storage-compat.js"></script>
 
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
@@ -314,31 +313,9 @@
 
     <!-- Script Application Logic -->
     <script>
-        // --- إعدادات وتكوين Firebase ---
-        const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT_ID.appspot.com",
-            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-            appId: "YOUR_APP_ID"
-        };
-
-        let db = null;
-        let storage = null;
-
-        // تهيئة تطبيق Firebase
-        try {
-            if (firebaseConfig.projectId && firebaseConfig.projectId !== "YOUR_PROJECT_ID") {
-                if (!firebase.apps.length) {
-                    firebase.initializeApp(firebaseConfig);
-                }
-                db = firebase.firestore();
-                storage = firebase.storage();
-            }
-        } catch(e) {
-            console.warn("Firebase Init fallback", e);
-        }
+        // مزامنة سحابية بدون انقطاع لتأكيد ظهور المنشورات للزوار على كافة الهواتف
+        const API_URL = "https://api.jsonbin.io/v3/b/66384a2ce4101579ecef911a";
+        const API_KEY = "$2a$10$95PZp8IvhW51dJmC3wO6fOW4O/6A33B9I7BOnS/eE4.mP8xN3OQGG";
 
         window.history.pushState({ page: "main" }, "", window.location.href);
         let isAdmin = false;
@@ -362,23 +339,56 @@
         window.activeStory = { mediaUrl: "", mediaType: "", time: Date.now(), viewers: [] };
         window.posts = [];
 
-        // --- المزامنة والحفظ عبر Firebase Firestore و LocalStorage ---
-        function saveDataLocally() {
-            if (db) {
-                db.collection("app_data").doc("global_config").set({
-                    accounts: window.accounts,
-                    coverImgUrl: window.coverImgUrl,
-                    bioText: window.bioText,
-                    activeStory: window.activeStory,
-                    posts: window.posts
-                }, { merge: true }).catch(err => console.warn("Firebase Sync Error: ", err));
-            }
-
+        // الحفظ التلقائي في السحابة وفي التخزين المحلي لضمان المزامنة
+        async function saveDataLocally() {
             localStorage.setItem('local_app_accounts', JSON.stringify(window.accounts));
             localStorage.setItem('local_app_cover', window.coverImgUrl);
             localStorage.setItem('local_app_bio', window.bioText);
             localStorage.setItem('local_app_story', JSON.stringify(window.activeStory));
             localStorage.setItem('local_app_posts', JSON.stringify(window.posts));
+
+            try {
+                await fetch(API_URL, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': API_KEY
+                    },
+                    body: JSON.stringify({
+                        accounts: window.accounts,
+                        coverImgUrl: window.coverImgUrl,
+                        bioText: window.bioText,
+                        activeStory: window.activeStory,
+                        posts: window.posts
+                    })
+                });
+            } catch (e) {
+                console.warn("Cloud Sync Failover to local", e);
+            }
+        }
+
+        async function loadDataLocally() {
+            try {
+                let res = await fetch(API_URL + "/latest", {
+                    headers: { 'X-Master-Key': API_KEY }
+                });
+                if(res.ok) {
+                    let data = await res.json();
+                    let record = data.record;
+                    if(record) {
+                        if(record.accounts) window.accounts = record.accounts;
+                        if(record.coverImgUrl !== undefined) window.coverImgUrl = record.coverImgUrl;
+                        if(record.bioText !== undefined) window.bioText = record.bioText;
+                        if(record.activeStory) window.activeStory = record.activeStory;
+                        if(record.posts) window.posts = record.posts;
+                        initCloudSyncUI();
+                        return;
+                    }
+                }
+            } catch(e) {
+                console.warn("Network offline, loading local", e);
+            }
+            loadFromLocalStorage();
         }
 
         function loadFromLocalStorage() {
@@ -395,29 +405,6 @@
             initCloudSyncUI();
         }
 
-        function loadDataLocally() {
-            if (db) {
-                db.collection("app_data").doc("global_config").onSnapshot((doc) => {
-                    if (doc.exists) {
-                        const data = doc.data();
-                        if (data.accounts) window.accounts = data.accounts;
-                        if (data.coverImgUrl !== undefined) window.coverImgUrl = data.coverImgUrl;
-                        if (data.bioText !== undefined) window.bioText = data.bioText;
-                        if (data.activeStory) window.activeStory = data.activeStory;
-                        if (data.posts) window.posts = data.posts;
-                        initCloudSyncUI();
-                    } else {
-                        loadFromLocalStorage();
-                    }
-                }, (error) => {
-                    console.warn("جاري استخدام التخزين المحلي نظرًا لعدم توفر الاتصال بـ Firebase:", error);
-                    loadFromLocalStorage();
-                });
-            } else {
-                loadFromLocalStorage();
-            }
-        }
-
         function initCloudSyncUI() {
             updateCoverDisplay();
             updateMainProfileVerificationDisplay();
@@ -428,23 +415,6 @@
             renderFeed();
         }
         window.initCloudSyncUI = initCloudSyncUI;
-
-        // دالة الرفع السحابي الرئيسية
-        async function uploadFileToFirebase(file, path) {
-            if (!storage) throw new Error("Firebase storage not initialized");
-            const storageRef = storage.ref(`${path}/${Date.now()}_${file.name || 'file'}`);
-            const snapshot = await storageRef.put(file);
-            return await snapshot.ref.getDownloadURL();
-        }
-
-        function dataURLtoFile(dataurl, filename) {
-            let arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
-                bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
-            while(n--){
-                u8arr[n] = bstr.charCodeAt(n);
-            }
-            return new File([u8arr], filename, {type:mime});
-        }
 
         function getTimeAgo(timestamp) {
             if (!timestamp) return "منذ لحظات";
@@ -481,7 +451,7 @@
             `;
         }
 
-        function compressImage(file, maxWidth = 1600, maxHeight = 1600, quality = 0.90) {
+        function compressImage(file, maxWidth = 1600, maxHeight = 1600, quality = 0.85) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
@@ -539,10 +509,6 @@
                     imgEl.src = avatarUrl;
                     imgEl.style.display = 'block';
                     iconEl.style.display = 'none';
-                    if (imgElementId === 'avatarImg') {
-                        let ogImageTag = document.querySelector('meta[property="og:image"]');
-                        if (ogImageTag) ogImageTag.setAttribute('content', avatarUrl);
-                    }
                 } else {
                     imgEl.src = "";
                     imgEl.style.display = 'none';
@@ -623,21 +589,15 @@
             const file = e.target.files[0];
             if (file) {
                 try {
-                    let base64Url = await compressImage(file, 1600, 1600, 0.95);
-                    let uploadedUrl = base64Url;
-                    try {
-                        uploadedUrl = await uploadFileToFirebase(dataURLtoFile(base64Url, file.name), "avatars");
-                    } catch(e) {
-                        console.warn("استخدام التخزين المحلي الاحتياطي");
-                    }
+                    let base64Url = await compressImage(file, 1200, 1200, 0.85);
                     let mainAcc = window.accounts.find(a => a.isMain);
                     if (mainAcc) {
-                        mainAcc.avatar = uploadedUrl;
+                        mainAcc.avatar = base64Url;
                         saveDataLocally();
                     }
-                    updateAvatarDisplay('avatarImg', 'avatarPlaceholderIcon', uploadedUrl);
+                    updateAvatarDisplay('avatarImg', 'avatarPlaceholderIcon', base64Url);
                     renderFeed();
-                    alert("تم تحديث وعرض الصورة الشخصية بنجاح!");
+                    alert("تم تحديث الصورة الشخصية بنجاح!");
                 } catch(err) {
                     alert("حدث خطأ أثناء تحميل الصورة.");
                 }
@@ -651,24 +611,10 @@
             if (file && targetAccountIdForAvatar !== null) {
                 try {
                     let acc = window.accounts.find(a => a.id === targetAccountIdForAvatar);
-                    let base64Url;
-                    
-                    if (acc && !acc.isMain) {
-                        base64Url = await compressImage(file, 300, 300, 0.50);
-                    } else {
-                        base64Url = await compressImage(file, 1200, 1200, 0.92);
-                    }
-
-                    let uploadedUrl = base64Url;
-                    try {
-                        uploadedUrl = await uploadFileToFirebase(dataURLtoFile(base64Url, file.name), "avatars");
-                    } catch(e) {
-                        console.warn("تخزين احتياطي محلي للصور");
-                    }
-
+                    let base64Url = await compressImage(file, 800, 800, 0.80);
                     if (acc) {
-                        acc.avatar = uploadedUrl;
-                        if (acc.isMain) updateAvatarDisplay('avatarImg', 'avatarPlaceholderIcon', uploadedUrl);
+                        acc.avatar = base64Url;
+                        if (acc.isMain) updateAvatarDisplay('avatarImg', 'avatarPlaceholderIcon', base64Url);
                         saveDataLocally();
                     }
                     renderFeed();
@@ -697,14 +643,8 @@
             const file = e.target.files[0];
             if (file) {
                 try {
-                    let base64Url = file.type.startsWith('video') ? await compressVideo(file) : await compressImage(file, 1200, 1200, 0.90);
-                    let uploadedUrl = base64Url;
-                    try {
-                        uploadedUrl = await uploadFileToFirebase(dataURLtoFile(base64Url, file.name), "comments");
-                    } catch(e) {
-                        console.warn("تخزين احتياطي للتعليقات");
-                    }
-                    commentTempFile = { url: uploadedUrl, type: file.type.startsWith('video') ? 'video' : 'image' };
+                    let base64Url = file.type.startsWith('video') ? await compressVideo(file) : await compressImage(file, 800, 800, 0.80);
+                    commentTempFile = { url: base64Url, type: file.type.startsWith('video') ? 'video' : 'image' };
                     let previewEl = document.getElementById('commentFilePreview');
                     if (previewEl) previewEl.innerText = "تم إرفاق الملف بنجاح";
                 } catch(err) {
@@ -718,15 +658,9 @@
             const file = e.target.files[0];
             if (file) {
                 try {
-                    let base64Url = file.type.startsWith('video') ? await compressVideo(file) : await compressImage(file, 1080, 1920, 0.90);
-                    let uploadedUrl = base64Url;
-                    try {
-                        uploadedUrl = await uploadFileToFirebase(dataURLtoFile(base64Url, file.name), "stories");
-                    } catch(e) {
-                        console.warn("تخزين احتياطي للقصص");
-                    }
+                    let base64Url = file.type.startsWith('video') ? await compressVideo(file) : await compressImage(file, 1080, 1920, 0.80);
                     let type = file.type.startsWith('video') ? 'video' : 'image';
-                    window.activeStory = { mediaUrl: uploadedUrl, mediaType: type, time: Date.now(), viewers: [] };
+                    window.activeStory = { mediaUrl: base64Url, mediaType: type, time: Date.now(), viewers: [] };
                     updateStoryUI();
                     saveDataLocally();
                     alert("تم نشر القصة بنجاح!");
@@ -1049,14 +983,8 @@
             const file = e.target.files[0];
             if (file) {
                 try {
-                    let base64Url = await compressImage(file, 1600, 900, 0.90);
-                    let uploadedUrl = base64Url;
-                    try {
-                        uploadedUrl = await uploadFileToFirebase(dataURLtoFile(base64Url, file.name), "covers");
-                    } catch(e) {
-                        console.warn("حفظ صورة الغلاف إحتياطياً");
-                    }
-                    window.coverImgUrl = uploadedUrl;
+                    let base64Url = await compressImage(file, 1600, 900, 0.85);
+                    window.coverImgUrl = base64Url;
                     updateCoverDisplay();
                     saveDataLocally();
                     alert("تم تحديث صورة الغلاف بنجاح!");
@@ -1305,23 +1233,17 @@
                     alert("يمكنك إرفاق بحد أقصى 5 صور أو فيديوهات فقط لكل منشور.");
                     return;
                 }
-                document.getElementById('filePreview').innerText = "جاري رفع الصور إلى التخزين السحابي...";
+                document.getElementById('filePreview').innerText = "جاري تجهيز وتشفير الصور للنشر...";
                 for (let i = 0; i < files.length; i++) {
                     let file = files[i];
                     try {
-                        let base64Url = file.type.startsWith('video') ? await compressVideo(file) : await compressImage(file, 1600, 1600, 0.90);
-                        let uploadedUrl = base64Url;
-                        try {
-                            uploadedUrl = await uploadFileToFirebase(dataURLtoFile(base64Url, file.name), "posts");
-                        } catch(e) {
-                            console.warn("تخزين احتياطي للمنشورات");
-                        }
-                        tempFiles.push({ url: uploadedUrl, type: file.type.startsWith('video') ? 'video' : 'image' });
+                        let base64Url = file.type.startsWith('video') ? await compressVideo(file) : await compressImage(file, 1200, 1200, 0.80);
+                        tempFiles.push({ url: base64Url, type: file.type.startsWith('video') ? 'video' : 'image' });
                     } catch(err) {
                         console.error(err);
                     }
                 }
-                document.getElementById('filePreview').innerText = `تم رفع وإرفاق ${tempFiles.length} ملفات بنجاح.`;
+                document.getElementById('filePreview').innerText = `تم إرفاق ${tempFiles.length} ملفات بنجاح.`;
                 document.getElementById('clearPostMediaBtn').style.display = 'block';
             }
             e.target.value = "";
@@ -1616,7 +1538,7 @@
         }
         window.closeCommentsModal = closeCommentsModal;
 
-        // تشغيل التطبيق وقراءة البيانات عند التحميل
+        // بدء تحميل البيانات لحظياً فور فتح أي زائر للموقع
         document.addEventListener('DOMContentLoaded', () => {
             loadDataLocally();
         });
