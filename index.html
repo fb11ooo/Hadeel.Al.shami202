@@ -68,9 +68,8 @@
         .comment-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; cursor: pointer; background: #e4e6eb; }
         .comment-bubble-container { max-width: 85%; }
         .comment-bubble { background: #f0f2f5; padding: 10px 14px; border-radius: 18px; font-size: 17px; color: #050505; line-height: 1.4; word-break: break-word; position: relative; font-weight: 500; }
-        .comment-author-name { font-weight: 700; font-size: 15px; display: inline-flex; align-items: center; gap: 4px; margin-bottom: 2px; cursor: pointer; }
-        .comment-badge { background: #e4e6eb; font-size: 11px; padding: 1px 6px; border-radius: 4px; color: #65676b; margin-right: 5px; font-weight: 600; }
-        .comment-meta { font-size: 11px; color: #65676b; margin-top: 3px; padding-right: 10px; display: flex; gap: 10px; align-items: center; font-weight: 600; }
+        .comment-author-name { font-weight: 700; font-size: 16px; display: inline-flex; align-items: center; gap: 4px; margin-bottom: 2px; cursor: pointer; }
+        .comment-meta { font-size: 14px; color: #65676b; margin-top: 3px; padding-right: 10px; display: flex; gap: 10px; align-items: center; font-weight: 600; }
         .comment-meta span { font-weight: 700; }
         .comment-attachment { max-width: 180px; max-height: 180px; width: auto; height: auto; border-radius: 8px; margin-top: 8px; object-fit: contain; border: none; cursor: pointer; display: block; background: #fff; }
         .image-viewer-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 3000; justify-content: center; align-items: center; }
@@ -1248,6 +1247,104 @@
         }
         window.publishPost = publishPost;
 
+        // دوال إدارة الردود وإظهارها بنجاح
+        function toggleReplies(postId, cIdx) {
+            let key = `${postId}_${cIdx}`;
+            visibleRepliesMap[key] = !visibleRepliesMap[key];
+            openComments(postId);
+        }
+        window.toggleReplies = toggleReplies;
+
+        function startReply(postId, cIdx) {
+            currentReplyCommentIndex = cIdx;
+            openComments(postId);
+        }
+        window.startReply = startReply;
+
+        function cancelReply() {
+            currentReplyCommentIndex = null;
+            if (currentPostIdForComment) openComments(currentPostIdForComment);
+        }
+        window.cancelReply = cancelReply;
+
+        function editComment(postId, cIdx) {
+            let post = window.posts.find(p => String(p.id) === String(postId));
+            if (!post || !post.comments[cIdx]) return;
+            let newText = prompt("تعديل التعليق:", post.comments[cIdx].text);
+            if (newText !== null) {
+                post.comments[cIdx].text = newText.trim();
+                saveDataLocally();
+                openComments(postId);
+            }
+        }
+        window.editComment = editComment;
+
+        function deleteComment(postId, cIdx) {
+            if (confirm("هل أنت متأكد من حذف هذا التعليق؟")) {
+                let post = window.posts.find(p => String(p.id) === String(postId));
+                if (!post) return;
+                post.comments.splice(cIdx, 1);
+                updateCommentsCount(post);
+                saveDataLocally();
+                openComments(postId);
+                renderFeed();
+            }
+        }
+        window.deleteComment = deleteComment;
+
+        function editReply(postId, cIdx, rIdx) {
+            let post = window.posts.find(p => String(p.id) === String(postId));
+            if (!post || !post.comments[cIdx].replies[rIdx]) return;
+            let reply = post.comments[cIdx].replies[rIdx];
+            let newText = prompt("تعديل الرد:", reply.text);
+            if (newText !== null) {
+                reply.text = newText.trim();
+                saveDataLocally();
+                openComments(postId);
+            }
+        }
+        window.editReply = editReply;
+
+        function deleteReply(postId, cIdx, rIdx) {
+            if (confirm("هل أنت متأكد من حذف هذا الرد؟")) {
+                let post = window.posts.find(p => String(p.id) === String(postId));
+                if (!post || !post.comments[cIdx].replies) return;
+                post.comments[cIdx].replies.splice(rIdx, 1);
+                updateCommentsCount(post);
+                saveDataLocally();
+                openComments(postId);
+                renderFeed();
+            }
+        }
+        window.deleteReply = deleteReply;
+
+        function reactToComment(postId, cIdx) {
+            let post = window.posts.find(p => String(p.id) === String(postId));
+            if (!post || !post.comments[cIdx]) return;
+            let emojis = ["👍", "❤️", "😆", "😮", "😢", "😡"];
+            let choice = prompt("اختر تفاعلاً للتعليق (👍, ❤️, 😆, 😮, 😢, 😡):", "👍");
+            if (choice && emojis.includes(choice)) {
+                post.comments[cIdx].reaction = post.comments[cIdx].reaction === choice ? "" : choice;
+                saveDataLocally();
+                openComments(postId);
+            }
+        }
+        window.reactToComment = reactToComment;
+
+        function reactToReply(postId, cIdx, rIdx) {
+            let post = window.posts.find(p => String(p.id) === String(postId));
+            if (!post || !post.comments[cIdx].replies[rIdx]) return;
+            let emojis = ["👍", "❤️", "😆", "😮", "😢", "😡"];
+            let choice = prompt("اختر تفاعلاً للرد (👍, ❤️, 😆, 😮, 😢, 😡):", "👍");
+            if (choice && emojis.includes(choice)) {
+                let reply = post.comments[cIdx].replies[rIdx];
+                reply.reaction = reply.reaction === choice ? "" : choice;
+                saveDataLocally();
+                openComments(postId);
+            }
+        }
+        window.reactToReply = reactToReply;
+
         function openComments(postId) {
             currentPostIdForComment = String(postId);
             let post = window.posts.find(p => String(p.id) === currentPostIdForComment);
@@ -1416,106 +1513,6 @@
             });
             post.commentsCount = total + " تعليقات";
         }
-
-        // --- الدوال المضافة الخاصة بالردود والتفاعلات ---
-        function toggleReplies(postId, cIdx) {
-            let key = `${postId}_${cIdx}`;
-            visibleRepliesMap[key] = !visibleRepliesMap[key];
-            openComments(postId);
-        }
-        window.toggleReplies = toggleReplies;
-
-        function startReply(postId, cIdx) {
-            currentReplyCommentIndex = cIdx;
-            openComments(postId);
-        }
-        window.startReply = startReply;
-
-        function cancelReply() {
-            currentReplyCommentIndex = null;
-            if (currentPostIdForComment) openComments(currentPostIdForComment);
-        }
-        window.cancelReply = cancelReply;
-
-        function reactToComment(postId, cIdx) {
-            let reaction = prompt("اختر تفاعل (👍, ❤️, 😆, 😮, 😢, 😡):", "👍");
-            if (reaction !== null) {
-                let post = window.posts.find(p => String(p.id) === String(postId));
-                if (post && post.comments[cIdx]) {
-                    post.comments[cIdx].reaction = reaction;
-                    saveDataLocally();
-                    openComments(postId);
-                }
-            }
-        }
-        window.reactToComment = reactToComment;
-
-        function editComment(postId, cIdx) {
-            let post = window.posts.find(p => String(p.id) === String(postId));
-            if (post && post.comments[cIdx]) {
-                let newText = prompt("تعديل التعليق:", post.comments[cIdx].text);
-                if (newText !== null) {
-                    post.comments[cIdx].text = newText.trim();
-                    saveDataLocally();
-                    openComments(postId);
-                }
-            }
-        }
-        window.editComment = editComment;
-
-        function deleteComment(postId, cIdx) {
-            if (confirm("هل أنت متأكد من حذف هذا التعليق؟")) {
-                let post = window.posts.find(p => String(p.id) === String(postId));
-                if (post && post.comments[cIdx]) {
-                    post.comments.splice(cIdx, 1);
-                    updateCommentsCount(post);
-                    saveDataLocally();
-                    openComments(postId);
-                    renderFeed();
-                }
-            }
-        }
-        window.deleteComment = deleteComment;
-
-        function reactToReply(postId, cIdx, rIdx) {
-            let reaction = prompt("اختر تفاعل (👍, ❤️, 😆, 😮, 😢, 😡):", "👍");
-            if (reaction !== null) {
-                let post = window.posts.find(p => String(p.id) === String(postId));
-                if (post && post.comments[cIdx] && post.comments[cIdx].replies[rIdx]) {
-                    post.comments[cIdx].replies[rIdx].reaction = reaction;
-                    saveDataLocally();
-                    openComments(postId);
-                }
-            }
-        }
-        window.reactToReply = reactToReply;
-
-        function editReply(postId, cIdx, rIdx) {
-            let post = window.posts.find(p => String(p.id) === String(postId));
-            if (post && post.comments[cIdx] && post.comments[cIdx].replies[rIdx]) {
-                let newText = prompt("تعديل الرد:", post.comments[cIdx].replies[rIdx].text);
-                if (newText !== null) {
-                    post.comments[cIdx].replies[rIdx].text = newText.trim();
-                    saveDataLocally();
-                    openComments(postId);
-                }
-            }
-        }
-        window.editReply = editReply;
-
-        function deleteReply(postId, cIdx, rIdx) {
-            if (confirm("هل أنت متأكد من حذف هذا الرد؟")) {
-                let post = window.posts.find(p => String(p.id) === String(postId));
-                if (post && post.comments[cIdx] && post.comments[cIdx].replies[rIdx]) {
-                    post.comments[cIdx].replies.splice(rIdx, 1);
-                    updateCommentsCount(post);
-                    saveDataLocally();
-                    openComments(postId);
-                    renderFeed();
-                }
-            }
-        }
-        window.deleteReply = deleteReply;
     </script>
 
     <!-- Firebase SDK Scripts -->
