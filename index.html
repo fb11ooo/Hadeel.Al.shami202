@@ -383,7 +383,8 @@
             `;
         }
 
-        function compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0.65) {
+        // تم رفع دقة وأبعاد وجودة الصور لمنع أي ضغط أو تشويش
+        function compressImage(file, maxWidth = 1600, maxHeight = 1600, quality = 0.90) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
@@ -525,7 +526,7 @@
             const file = e.target.files[0];
             if (file) {
                 try {
-                    let compressedUrl = await compressImage(file, 250, 250, 0.7);
+                    let compressedUrl = await compressImage(file, 600, 600, 0.92);
                     let mainAcc = window.accounts.find(a => a.isMain);
                     if (mainAcc) {
                         mainAcc.avatar = compressedUrl;
@@ -533,9 +534,9 @@
                     }
                     updateAvatarDisplay('avatarImg', 'avatarPlaceholderIcon', compressedUrl);
                     renderFeed();
-                    alert("تم ضغط وتحديث صورة الصفحة وحفظها سحابياً بكفاءة عالية!");
+                    alert("تم تحديث وعرض الصورة الشخصية بدقة عالية جداً!");
                 } catch(err) {
-                    alert("حدث خطأ أثناء تحميل وضغط الصورة.");
+                    alert("حدث خطأ أثناء تحميل الصورة.");
                 }
             }
         }
@@ -546,7 +547,7 @@
             const file = e.target.files[0];
             if (file && targetAccountIdForAvatar !== null) {
                 try {
-                    let compressedUrl = await compressImage(file, 250, 250, 0.7);
+                    let compressedUrl = await compressImage(file, 600, 600, 0.92);
                     let acc = window.accounts.find(a => a.id === targetAccountIdForAvatar);
                     if (acc) {
                         acc.avatar = compressedUrl;
@@ -554,10 +555,10 @@
                         saveDataLocally();
                     }
                     renderFeed();
-                    alert("تم ضغط وتحديث صورة الحساب بنجاح وحفظها سحابياً!");
+                    alert("تم تحديث صورة الحساب بنجاح وبدقة كاملة!");
                     targetAccountIdForAvatar = null;
                 } catch(err) {
-                    alert("حدث خطأ أثناء تحميل وضغط الصورة.");
+                    alert("حدث خطأ أثناء تحميل الصورة.");
                 }
             }
         }
@@ -590,10 +591,10 @@
             const file = e.target.files[0];
             if (file) {
                 try {
-                    let base64Url = file.type.startsWith('video') ? await compressVideo(file) : await compressImage(file, 600, 600, 0.65);
+                    let base64Url = file.type.startsWith('video') ? await compressVideo(file) : await compressImage(file, 1200, 1200, 0.90);
                     commentTempFile = { url: base64Url, type: file.type.startsWith('video') ? 'video' : 'image' };
                     let previewEl = document.getElementById('commentFilePreview');
-                    if (previewEl) previewEl.innerText = "تم إرفاق الملف وضغطه بنجاح";
+                    if (previewEl) previewEl.innerText = "تم إرفاق الملف بجودة عالية";
                 } catch(err) {
                     alert("حدث خطأ أثناء رفع الملف.");
                 }
@@ -605,12 +606,12 @@
             const file = e.target.files[0];
             if (file) {
                 try {
-                    let base64Url = file.type.startsWith('video') ? await compressVideo(file) : await compressImage(file, 700, 900, 0.7);
+                    let base64Url = file.type.startsWith('video') ? await compressVideo(file) : await compressImage(file, 1080, 1920, 0.90);
                     let type = file.type.startsWith('video') ? 'video' : 'image';
                     window.activeStory = { mediaUrl: base64Url, mediaType: type, time: Date.now(), viewers: [] };
                     updateStoryUI();
                     saveDataLocally();
-                    alert("تم نشر وضغط القصة وحفظها سحابياً بنجاح!");
+                    alert("تم نشر القصة بجودة عالية ووضوح تام!");
                 } catch(err) {
                     alert("حدث خطأ أثناء رفع القصة.");
                 }
@@ -930,10 +931,10 @@
             const file = e.target.files[0];
             if (file) {
                 try {
-                    window.coverImgUrl = await compressImage(file, 900, 450, 0.65);
+                    window.coverImgUrl = await compressImage(file, 1600, 900, 0.90);
                     updateCoverDisplay();
                     saveDataLocally();
-                    alert("تم ضغط وتحديث غلاف الصفحة وحفظه سحابياً بكفاءة!");
+                    alert("تم تحديث صورة الغلاف بدقة عالية!");
                 } catch(err) {
                     alert("حدث خطأ أثناء رفع صورة الغلاف.");
                 }
@@ -980,21 +981,22 @@
                 if (m.type === 'video') {
                     return `
                         <div style="position:relative; width:100%; background:#000; cursor:pointer;" onclick="openVideoViewer('${m.url}', ${authorId}, '${reactions}', '${commentsCount}', '${postId}', '${reactionType}')">
-                            <video src="${m.url}" controlslist="nodownload noplaybackrate" disablepictureinpicture oncontextmenu="return false;" style="width:100%; max-height:450px; object-fit:cover; display:block; pointer-events:none;"></video>
+                            <video src="${m.url}" controlslist="nodownload noplaybackrate" disablepictureinpicture oncontextmenu="return false;" style="width:100%; max-height:550px; object-fit:contain; display:block; pointer-events:none;"></video>
                             <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.6); width:60px; height:60px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-size:24px;">
                                 <i class="fa-solid fa-play" style="margin-left:3px;"></i>
                             </div>
                         </div>
                     `;
                 } else {
-                    return `<img src="${m.url}" class="post-media" style="width:100%; max-height:450px; object-fit:cover; display:block; cursor:pointer;" onclick="openImageViewer('${m.url}')" title="انقر لعرض الصورة">`;
+                    // تم تغيير object-fit إلى contain أو إتاحة العرض بالكامل بدون قص للحفاظ على وضوح الصورة بالكامل
+                    return `<img src="${m.url}" class="post-media" style="width:100%; max-height:600px; object-fit:contain; background:#f9f9f9; display:block; cursor:pointer;" onclick="openImageViewer('${m.url}')" title="انقر لعرض الصورة بالحجم الكامل">`;
                 }
             }
             let count = mediaFiles.length;
-            let gridStyle = 'display: grid; gap: 2px; width: 100%; max-height: 450px; overflow: hidden; background: #fff;';
-            if (count === 2) gridStyle += ' grid-template-columns: 1fr 1fr; height: 350px;';
-            else if (count === 3) gridStyle += ' grid-template-columns: 2fr 1fr; grid-template-rows: 1fr 1fr; height: 380px;';
-            else gridStyle += ' grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; height: 380px;';
+            let gridStyle = 'display: grid; gap: 2px; width: 100%; max-height: 500px; overflow: hidden; background: #fff;';
+            if (count === 2) gridStyle += ' grid-template-columns: 1fr 1fr; height: 380px;';
+            else if (count === 3) gridStyle += ' grid-template-columns: 2fr 1fr; grid-template-rows: 1fr 1fr; height: 400px;';
+            else gridStyle += ' grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; height: 400px;';
 
             let itemsHtml = mediaFiles.slice(0, 4).map((m, idx) => {
                 let currentPost = window.posts.find(p => String(p.id) === String(postId));
@@ -1006,12 +1008,12 @@
                 if (idx === 3 && count > 4) {
                     extraOverlay = `<div style="position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); color: #fff; display: flex; justify-content: center; align-items: center; font-size: 26px; font-weight: 700;">+${count - 4}</div>`;
                 }
-                let itemStyle = 'position: relative; width: 100%; height: 100%; overflow: hidden; cursor: pointer; background: #000;';
+                let itemStyle = 'position: relative; width: 100%; height: 100%; overflow: hidden; cursor: pointer; background: #f9f9f9; display:flex; align-items:center; justify-content:center;';
                 if (count === 3 && idx === 0) itemStyle += ' grid-row: span 2;';
                 if (m.type === 'video') {
                     return `
-                        <div style="${itemStyle}" onclick="openVideoViewer('${m.url}', ${authorId}, '${reactions}', '${commentsCount}', '${postId}', '${reactionType}')">
-                            <video src="${m.url}" controlslist="nodownload noplaybackrate" disablepictureinpicture oncontextmenu="return false;" style="width: 100%; height: 100%; object-fit: cover; display: block; pointer-events:none;"></video>
+                        <div style="${itemStyle} background:#000;" onclick="openVideoViewer('${m.url}', ${authorId}, '${reactions}', '${commentsCount}', '${postId}', '${reactionType}')">
+                            <video src="${m.url}" controlslist="nodownload noplaybackrate" disablepictureinpicture oncontextmenu="return false;" style="width: 100%; height: 100%; object-fit: contain; display: block; pointer-events:none;"></video>
                             <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.6); width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-size:16px;">
                                 <i class="fa-solid fa-play" style="margin-left:2px;"></i>
                             </div>
@@ -1021,7 +1023,7 @@
                 } else {
                     return `
                         <div style="${itemStyle}" onclick="openImageViewer('${m.url}')">
-                            <img src="${m.url}" style="width: 100%; height: 100%; object-fit: cover; display: block;">
+                            <img src="${m.url}" style="width: 100%; height: 100%; object-fit: contain; display: block;">
                             ${extraOverlay}
                         </div>
                     `;
@@ -1181,17 +1183,17 @@
                     alert("يمكنك إرفاق بحد أقصى 5 صور أو فيديوهات فقط لكل منشور.");
                     return;
                 }
-                document.getElementById('filePreview').innerText = "جاري ضغط ومعالجة الملفات...";
+                document.getElementById('filePreview').innerText = "جاري تحميل ومعالجة الصور بجودة عالية...";
                 for (let i = 0; i < files.length; i++) {
                     let file = files[i];
                     try {
-                        let base64Url = file.type.startsWith('video') ? await compressVideo(file) : await compressImage(file, 800, 800, 0.65);
+                        let base64Url = file.type.startsWith('video') ? await compressVideo(file) : await compressImage(file, 1600, 1600, 0.90);
                         tempFiles.push({ url: base64Url, type: file.type.startsWith('video') ? 'video' : 'image' });
                     } catch(err) {
                         console.error(err);
                     }
                 }
-                document.getElementById('filePreview').innerText = `تم ضغط وإرفاق ${tempFiles.length} ملفات بنجاح.`;
+                document.getElementById('filePreview').innerText = `تم إرفاق ${tempFiles.length} ملفات بجودة عالية وبدون ضغط ممحو.`;
                 document.getElementById('clearPostMediaBtn').style.display = 'block';
             }
             e.target.value = "";
@@ -1550,7 +1552,6 @@
             }
         };
 
-        // استدعاء جلب واستماع البيانات داخل حدث تحميل الصفحة DOMContentLoaded باستخدام onSnapshot
         document.addEventListener("DOMContentLoaded", () => {
             onSnapshot(window.docRef, async (snap) => {
                 if (snap.exists()) {
