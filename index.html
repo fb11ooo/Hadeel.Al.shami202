@@ -16,6 +16,11 @@
     <link rel="icon" href="https://i.ibb.co/6Ry0q28/avatar-placeholder.png" type="image/png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
+    <!-- Firebase SDK Compat Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-storage-compat.js"></script>
+
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
         body { background-color: #f0f2f5; color: #050505; }
@@ -70,7 +75,7 @@
         .comment-bubble { background: #f0f2f5; padding: 10px 14px; border-radius: 18px; font-size: 17px; color: #050505; line-height: 1.4; word-break: break-word; position: relative; font-weight: 500; }
         .comment-author-name { font-weight: 700; font-size: 16px; display: inline-flex; align-items: center; gap: 4px; margin-bottom: 2px; cursor: pointer; }
         .comment-meta { font-size: 14px; color: #65676b; margin-top: 3px; padding-right: 10px; display: flex; gap: 10px; align-items: center; font-weight: 600; }
-        .comment-meta span { font-weight: 700; }
+        .comment-meta span { font-weight: 700; cursor: pointer; }
         .comment-attachment { max-width: 180px; max-height: 180px; width: auto; height: auto; border-radius: 8px; margin-top: 8px; object-fit: contain; border: none; cursor: pointer; display: block; background: #fff; }
         .image-viewer-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 3000; justify-content: center; align-items: center; }
         .image-viewer-content { max-width: 95%; max-height: 95%; object-fit: contain; border-radius: 4px; }
@@ -309,6 +314,32 @@
 
     <!-- Script Application Logic -->
     <script>
+        // --- إعدادات وتكوين Firebase (ضع بيانات مشروعتك هنا عند التفعيل) ---
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        let db = null;
+        let storage = null;
+
+        // تهيئة تطبيق Firebase فقط في حال تغيير المعرف الافتراضي
+        try {
+            if (firebaseConfig.projectId && firebaseConfig.projectId !== "YOUR_PROJECT_ID") {
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(firebaseConfig);
+                }
+                db = firebase.firestore();
+                storage = firebase.storage();
+            }
+        } catch(e) {
+            console.warn("Firebase Init fallback", e);
+        }
+
         window.history.pushState({ page: "main" }, "", window.location.href);
         let isAdmin = false;
         let currentPostIdForComment = null;
@@ -331,9 +362,59 @@
         window.activeStory = { mediaUrl: "", mediaType: "", time: Date.now(), viewers: [] };
         window.posts = [];
 
+        // --- المزامنة والحفظ عبر Firebase Firestore و LocalStorage ---
         function saveDataLocally() {
-            if (typeof window.saveCloudData === 'function') {
-                window.saveCloudData();
+            if (db) {
+                db.collection("app_data").doc("global_config").set({
+                    accounts: window.accounts,
+                    coverImgUrl: window.coverImgUrl,
+                    bioText: window.bioText,
+                    activeStory: window.activeStory,
+                    posts: window.posts
+                }, { merge: true }).catch(err => console.warn("Firebase Sync Error: ", err));
+            }
+
+            localStorage.setItem('local_app_accounts', JSON.stringify(window.accounts));
+            localStorage.setItem('local_app_cover', window.coverImgUrl);
+            localStorage.setItem('local_app_bio', window.bioText);
+            localStorage.setItem('local_app_story', JSON.stringify(window.activeStory));
+            localStorage.setItem('local_app_posts', JSON.stringify(window.posts));
+        }
+
+        function loadFromLocalStorage() {
+            let accs = localStorage.getItem('local_app_accounts');
+            if (accs) window.accounts = JSON.parse(accs);
+            let cover = localStorage.getItem('local_app_cover');
+            if (cover) window.coverImgUrl = cover;
+            let bio = localStorage.getItem('local_app_bio');
+            if (bio) window.bioText = bio;
+            let story = localStorage.getItem('local_app_story');
+            if (story) window.activeStory = JSON.parse(story);
+            let posts = localStorage.getItem('local_app_posts');
+            if (posts) window.posts = JSON.parse(posts);
+            initCloudSyncUI();
+        }
+
+        function loadDataLocally() {
+            if (db) {
+                db.collection("app_data").doc("global_config").onSnapshot((doc) => {
+                    if (doc.exists) {
+                        const data = doc.data();
+                        if (data.accounts) window.accounts = data.accounts;
+                        if (data.coverImgUrl !== undefined) window.coverImgUrl = data.coverImgUrl;
+                        if (data.bioText !== undefined) window.bioText = data.bioText;
+                        if (data.activeStory) window.activeStory = data.activeStory;
+                        if (data.posts) window.posts = data.posts;
+                        initCloudSyncUI();
+                    } else {
+                        loadFromLocalStorage();
+                    }
+                }, (error) => {
+                    console.warn("جاري استخدام التخزين المحلي نظرًا لعدم توفر الاتصال بـ Firebase:", error);
+                    loadFromLocalStorage();
+                });
+            } else {
+                loadFromLocalStorage();
             }
         }
 
@@ -347,6 +428,22 @@
             renderFeed();
         }
         window.initCloudSyncUI = initCloudSyncUI;
+
+        async function uploadFileToFirebase(file, path) {
+            if (!storage) throw new Error("Firebase storage not initialized");
+            const storageRef = storage.ref(`${path}/${Date.now()}_${file.name || 'file'}`);
+            const snapshot = await storageRef.put(file);
+            return await snapshot.ref.getDownloadURL();
+        }
+
+        function dataURLtoFile(dataurl, filename) {
+            let arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
+                bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+            while(n--){
+                u8arr[n] = bstr.charCodeAt(n);
+            }
+            return new File([u8arr], filename, {type:mime});
+        }
 
         function getTimeAgo(timestamp) {
             if (!timestamp) return "منذ لحظات";
@@ -516,7 +613,7 @@
                 window.bioText = newBio.trim().replace(/\n/g, "<br>");
                 bioEl.innerHTML = window.bioText;
                 saveDataLocally();
-                alert("تم تحديث الوصف بنجاح وحفظه سحابياً.");
+                alert("تم تحديث الوصف بنجاح.");
             }
         }
         window.handleBioClick = handleBioClick;
@@ -525,15 +622,21 @@
             const file = e.target.files[0];
             if (file) {
                 try {
-                    let compressedUrl = await compressImage(file, 600, 600, 0.92);
+                    let base64Url = await compressImage(file, 1600, 1600, 0.95);
+                    let uploadedUrl = base64Url;
+                    try {
+                        uploadedUrl = await uploadFileToFirebase(dataURLtoFile(base64Url, file.name), "avatars");
+                    } catch(e) {
+                        console.warn("استخدام التخزين المحلي");
+                    }
                     let mainAcc = window.accounts.find(a => a.isMain);
                     if (mainAcc) {
-                        mainAcc.avatar = compressedUrl;
+                        mainAcc.avatar = uploadedUrl;
                         saveDataLocally();
                     }
-                    updateAvatarDisplay('avatarImg', 'avatarPlaceholderIcon', compressedUrl);
+                    updateAvatarDisplay('avatarImg', 'avatarPlaceholderIcon', uploadedUrl);
                     renderFeed();
-                    alert("تم تحديث وعرض الصورة الشخصية بدقة عالية جداً!");
+                    alert("تم تحديث وعرض الصورة الشخصية بنجاح!");
                 } catch(err) {
                     alert("حدث خطأ أثناء تحميل الصورة.");
                 }
@@ -546,16 +649,30 @@
             const file = e.target.files[0];
             if (file && targetAccountIdForAvatar !== null) {
                 try {
-                    let compressedUrl = await compressImage(file, 600, 600, 0.92);
                     let acc = window.accounts.find(a => a.id === targetAccountIdForAvatar);
+                    let base64Url;
+                    
+                    if (acc && !acc.isMain) {
+                        base64Url = await compressImage(file, 300, 300, 0.50);
+                    } else {
+                        base64Url = await compressImage(file, 1200, 1200, 0.92);
+                    }
+
+                    let uploadedUrl = base64Url;
+                    try {
+                        uploadedUrl = await uploadFileToFirebase(dataURLtoFile(base64Url, file.name), "avatars");
+                    } catch(e) {
+                        console.warn("تخزين احتياطي محلي للصور");
+                    }
+
                     if (acc) {
-                        acc.avatar = compressedUrl;
-                        if (acc.isMain) updateAvatarDisplay('avatarImg', 'avatarPlaceholderIcon', compressedUrl);
+                        acc.avatar = uploadedUrl;
+                        if (acc.isMain) updateAvatarDisplay('avatarImg', 'avatarPlaceholderIcon', uploadedUrl);
                         saveDataLocally();
                     }
                     renderFeed();
                     if (currentPostIdForComment) openComments(currentPostIdForComment);
-                    alert("تم تحديث صورة الحساب وحفظها سحابياً بنجاح!");
+                    alert("تم تحديث صورة الحساب بنجاح!");
                     targetAccountIdForAvatar = null;
                 } catch(err) {
                     alert("حدث خطأ أثناء تحميل الصورة.");
@@ -580,9 +697,15 @@
             if (file) {
                 try {
                     let base64Url = file.type.startsWith('video') ? await compressVideo(file) : await compressImage(file, 1200, 1200, 0.90);
-                    commentTempFile = { url: base64Url, type: file.type.startsWith('video') ? 'video' : 'image' };
+                    let uploadedUrl = base64Url;
+                    try {
+                        uploadedUrl = await uploadFileToFirebase(dataURLtoFile(base64Url, file.name), "comments");
+                    } catch(e) {
+                        console.warn("تخزين احتياطي للتعليقات");
+                    }
+                    commentTempFile = { url: uploadedUrl, type: file.type.startsWith('video') ? 'video' : 'image' };
                     let previewEl = document.getElementById('commentFilePreview');
-                    if (previewEl) previewEl.innerText = "تم إرفاق الملف بجودة عالية";
+                    if (previewEl) previewEl.innerText = "تم إرفاق الملف بنجاح";
                 } catch(err) {
                     alert("حدث خطأ أثناء رفع الملف.");
                 }
@@ -595,11 +718,17 @@
             if (file) {
                 try {
                     let base64Url = file.type.startsWith('video') ? await compressVideo(file) : await compressImage(file, 1080, 1920, 0.90);
+                    let uploadedUrl = base64Url;
+                    try {
+                        uploadedUrl = await uploadFileToFirebase(dataURLtoFile(base64Url, file.name), "stories");
+                    } catch(e) {
+                        console.warn("تخزين احتياطي للقصص");
+                    }
                     let type = file.type.startsWith('video') ? 'video' : 'image';
-                    window.activeStory = { mediaUrl: base64Url, mediaType: type, time: Date.now(), viewers: [] };
+                    window.activeStory = { mediaUrl: uploadedUrl, mediaType: type, time: Date.now(), viewers: [] };
                     updateStoryUI();
                     saveDataLocally();
-                    alert("تم نشر القصة بجودة عالية ووضوح تام!");
+                    alert("تم نشر القصة بنجاح!");
                 } catch(err) {
                     alert("حدث خطأ أثناء رفع القصة.");
                 }
@@ -919,10 +1048,17 @@
             const file = e.target.files[0];
             if (file) {
                 try {
-                    window.coverImgUrl = await compressImage(file, 1600, 900, 0.90);
+                    let base64Url = await compressImage(file, 1600, 900, 0.90);
+                    let uploadedUrl = base64Url;
+                    try {
+                        uploadedUrl = await uploadFileToFirebase(dataURLtoFile(base64Url, file.name), "covers");
+                    } catch(e) {
+                        console.warn("حفظ صورة الغلاف إحتياطياً");
+                    }
+                    window.coverImgUrl = uploadedUrl;
                     updateCoverDisplay();
                     saveDataLocally();
-                    alert("تم تحديث صورة الغلاف بدقة عالية!");
+                    alert("تم تحديث صورة الغلاف بنجاح!");
                 } catch(err) {
                     alert("حدث خطأ أثناء رفع صورة الغلاف.");
                 }
@@ -1081,10 +1217,8 @@
         }
 
         function openPostModal(postId = null) {
-            if (!isAdmin) {
-                alert("_");
-                return;
-            }
+            if (!isAdmin) return;
+
             currentEditingPostId = postId !== null ? String(postId) : null;
             let titleEl = document.getElementById('postModalTitle');
             let submitBtn = document.getElementById('postModalSubmitBtn');
@@ -1170,17 +1304,23 @@
                     alert("يمكنك إرفاق بحد أقصى 5 صور أو فيديوهات فقط لكل منشور.");
                     return;
                 }
-                document.getElementById('filePreview').innerText = "جاري تحميل ومعالجة الصور بجودة عالية...";
+                document.getElementById('filePreview').innerText = "جاري معالجة الصور إلكترونياً...";
                 for (let i = 0; i < files.length; i++) {
                     let file = files[i];
                     try {
                         let base64Url = file.type.startsWith('video') ? await compressVideo(file) : await compressImage(file, 1600, 1600, 0.90);
-                        tempFiles.push({ url: base64Url, type: file.type.startsWith('video') ? 'video' : 'image' });
+                        let uploadedUrl = base64Url;
+                        try {
+                            uploadedUrl = await uploadFileToFirebase(dataURLtoFile(base64Url, file.name), "posts");
+                        } catch(e) {
+                            console.warn("تخزين احتياطي للمنشورات");
+                        }
+                        tempFiles.push({ url: uploadedUrl, type: file.type.startsWith('video') ? 'video' : 'image' });
                     } catch(err) {
                         console.error(err);
                     }
                 }
-                document.getElementById('filePreview').innerText = `تم إرفاق ${tempFiles.length} ملفات بجودة عالية وبدون ضغط ممحو.`;
+                document.getElementById('filePreview').innerText = `تم إرفاق ${tempFiles.length} ملفات بنجاح.`;
                 document.getElementById('clearPostMediaBtn').style.display = 'block';
             }
             e.target.value = "";
@@ -1210,7 +1350,7 @@
                     post.authorId = authorId;
                     post.mediaFiles = [...tempFiles];
                 }
-                alert("تم تحديث المنشور وحفظه سحابياً بنجاح.");
+                alert("تم تحديث المنشور بنجاح.");
             } else {
                 let newPost = {
                     id: Date.now(),
@@ -1225,7 +1365,7 @@
                     comments: []
                 };
                 window.posts.unshift(newPost);
-                alert("تم النشر وحفظ المنشور سحابياً بنجاح!");
+                alert("تم النشر بنجاح!");
             }
             saveDataLocally();
             tempFiles = [];
@@ -1266,6 +1406,17 @@
             }
         }
         window.editComment = editComment;
+
+        function updateCommentsCount(post) {
+            let total = 0;
+            if (post.comments) {
+                total += post.comments.length;
+                post.comments.forEach(c => {
+                    if (c.replies) total += c.replies.length;
+                });
+            }
+            post.commentsCount = total + " تعليقات";
+        }
 
         function deleteComment(postId, cIdx) {
             if (confirm("هل أنت متأكد من حذف هذا التعليق؟")) {
@@ -1319,123 +1470,94 @@
         }
         window.reactToComment = reactToComment;
 
-        function reactToReply(postId, cIdx, rIdx) {
-            let post = window.posts.find(p => String(p.id) === String(postId));
-            if (!post || !post.comments[cIdx].replies[rIdx]) return;
-            let emojis = ["👍", "❤️", "😆", "😮", "😢", "😡"];
-            let choice = prompt("اختر تفاعلاً للرد (👍, ❤️, 😆, 😮, 😢, 😡):", "👍");
-            if (choice && emojis.includes(choice)) {
-                let reply = post.comments[cIdx].replies[rIdx];
-                reply.reaction = reply.reaction === choice ? "" : choice;
-                saveDataLocally();
-                openComments(postId);
-            }
-        }
-        window.reactToReply = reactToReply;
-
         function openComments(postId) {
             currentPostIdForComment = String(postId);
-            let post = window.posts.find(p => String(p.id) === currentPostIdForComment);
+            let post = window.posts.find(p => String(p.id) === String(postId));
             if (!post) return;
-
-            let modalBody = document.getElementById('modalBody');
-            let modalFooter = document.getElementById('modalFooter');
 
             if (!post.comments) post.comments = [];
 
-            modalBody.innerHTML = post.comments.length === 0 ? 
-                `<p style="text-align:center; color:#65676b; padding:20px; font-weight:600;">لا توجد تعليقات بعد.</p>` : 
-                post.comments.map((c, cIdx) => {
-                    let cAuthor = window.accounts.find(a => a.id === c.authorId) || { id: c.authorId, name: c.authorName || "زائر", avatar: c.avatar || "", isVerified: false };
-                    let cAvatarHtml = cAuthor.avatar ? `<img src="${cAuthor.avatar}" class="comment-avatar" onclick="handleAccountClick(${cAuthor.id})">` : `<div class="comment-avatar" style="background:#e4e6eb; display:flex; align-items:center; justify-content:center;" onclick="handleAccountClick(${cAuthor.id})"><i class="fa-solid fa-user" style="font-size:16px; color:#8a8d91;"></i></div>`;
-                    let attachmentHtml = c.attachment && c.attachment.url ? (c.attachment.type === 'video' ? `<video src="${c.attachment.url}" controls class="comment-attachment"></video>` : `<img src="${c.attachment.url}" class="comment-attachment" onclick="openImageViewer('${c.attachment.url}')">`) : '';
-                    let reactionBadge = c.reaction ? `<span style="background:#fff; border-radius:10px; padding:1px 5px; font-size:11px; box-shadow:0 1px 2px rgba(0,0,0,0.2); margin-right:4px;">${c.reaction}</span>` : '';
+            let bodyEl = document.getElementById('modalBody');
+            let footerEl = document.getElementById('modalFooter');
 
-                    let repliesHtml = '';
-                    let key = `${postId}_${cIdx}`;
-                    let showReplies = visibleRepliesMap[key];
-                    let repliesList = c.replies || [];
+            let commentsHtml = post.comments.map((c, cIdx) => {
+                let author = window.accounts.find(a => a.id === c.authorId) || window.accounts[0];
+                let key = `${postId}_${cIdx}`;
+                let showReplies = visibleRepliesMap[key];
+                let repliesList = c.replies || [];
 
-                    if (repliesList.length > 0) {
-                        let repliesCountText = `الردود (${repliesList.length})`;
-                        let renderedReplies = showReplies ? repliesList.map((r, rIdx) => {
-                            let rAuthor = window.accounts.find(a => a.id === r.authorId) || { id: r.authorId, name: r.authorName || "زائر", avatar: r.avatar || "", isVerified: false };
-                            let rAvatarHtml = rAuthor.avatar ? `<img src="${rAuthor.avatar}" style="width:28px; height:28px; border-radius:50%; object-fit:cover; cursor:pointer;" onclick="handleAccountClick(${rAuthor.id})">` : `<div style="width:28px; height:28px; border-radius:50%; background:#e4e6eb; display:flex; align-items:center; justify-content:center; cursor:pointer;" onclick="handleAccountClick(${rAuthor.id})"><i class="fa-solid fa-user" style="font-size:12px; color:#8a8d91;"></i></div>`;
-                            let rReactionBadge = r.reaction ? `<span style="background:#fff; border-radius:10px; padding:1px 5px; font-size:10px; box-shadow:0 1px 2px rgba(0,0,0,0.2); margin-right:4px;">${r.reaction}</span>` : '';
-                            return `
-                                <div style="display:flex; gap:8px; margin-top:8px; align-items:flex-start;">
-                                    ${rAvatarHtml}
-                                    <div style="max-width:85%;">
-                                        <div style="background:#f0f2f5; padding:8px 12px; border-radius:14px; font-size:14px;">
-                                            <span style="font-weight:700; font-size:12px; display:inline-flex; align-items:center; gap:4px; cursor:pointer;" onclick="handleAccountClick(${rAuthor.id})">${rAuthor.name} ${getVerifiedBadgeHtml(rAuthor)}</span>
-                                            <div>${linkify(r.text)}</div>
-                                        </div>
-                                        <div style="font-size:11px; color:#65676b; margin-top:2px; padding-right:8px; display:flex; gap:8px;">
-                                            <span>${getTimeAgo(r.time)}</span>
-                                            <span style="cursor:pointer; font-weight:700;" onclick="reactToReply('${postId}', ${cIdx}, ${rIdx})">أعجبني</span>
-                                            ${isAdmin ? `<span style="cursor:pointer; color:#0084ff;" onclick="editReply('${postId}', ${cIdx},${rIdx})">تعديل</span>` : ''}
-                                            ${isAdmin ? `<span style="cursor:pointer; color:red;" onclick="deleteReply('${postId}', ${cIdx},${rIdx})">حذف</span>` : ''}
-                                            ${rReactionBadge}
-                                        </div>
+                let attachmentHtml = '';
+                if (c.attachment && c.attachment.url) {
+                    if (c.attachment.type === 'video') {
+                        attachmentHtml = `<video src="${c.attachment.url}" controls style="max-width:200px; max-height:200px; border-radius:8px; margin-top:5px; display:block;"></video>`;
+                    } else {
+                        attachmentHtml = `<img src="${c.attachment.url}" class="comment-attachment" onclick="openImageViewer('${c.attachment.url}')">`;
+                    }
+                }
+
+                let repliesHtml = '';
+                if (showReplies && repliesList.length > 0) {
+                    repliesHtml = repliesList.map((r, rIdx) => {
+                        let rAuthor = window.accounts.find(a => a.id === r.authorId) || window.accounts[0];
+                        return `
+                            <div class="comment-item" style="margin-right: 40px; margin-top: 10px;">
+                                <img src="${rAuthor.avatar}" class="comment-avatar" onclick="handleAccountClick(${rAuthor.id})">
+                                <div class="comment-bubble-container">
+                                    <div class="comment-bubble">
+                                        <div class="comment-author-name" onclick="handleAccountClick(${rAuthor.id})">${rAuthor.name} ${getVerifiedBadgeHtml(rAuthor)}</div>
+                                        <div>${linkify(r.text)}</div>
+                                    </div>
+                                    <div class="comment-meta">
+                                        <span>${getTimeAgo(r.time)}</span>
+                                        ${isAdmin ? `<span onclick="editReply('${postId}', ${cIdx},${rIdx})">تعديل</span><span onclick="deleteReply('${postId}', ${cIdx},${rIdx})" style="color:red;">حذف</span>` : ''}
                                     </div>
                                 </div>
-                            `;
-                        }).join('') : '';
-
-                        repliesHtml = `
-                            <div style="margin-top:6px; padding-right:15px;">
-                                <span style="font-size:12px; color:#0084ff; font-weight:700; cursor:pointer;" onclick="toggleReplies('${postId}', ${cIdx})">${showReplies ? 'إخفاء الردود' : repliesCountText}</span>
-                                ${renderedReplies}
                             </div>
                         `;
-                    }
+                    }).join('');
+                }
 
-                    return `
-                        <div class="comment-item">
-                            ${cAvatarHtml}
-                            <div class="comment-bubble-container">
-                                <div class="comment-bubble">
-                                    <span class="comment-author-name" onclick="handleAccountClick(${cAuthor.id})">${cAuthor.name} ${getVerifiedBadgeHtml(cAuthor)}</span>
-                                    <div>${linkify(c.text)}</div>
-                                    ${attachmentHtml}
-                                    ${reactionBadge}
-                                </div>
-                                <div class="comment-meta">
-                                    <span>${getTimeAgo(c.time)}</span>
-                                    <span style="cursor:pointer;" onclick="reactToComment('${postId}', ${cIdx})">تفاعل</span>
-                                    ${isAdmin ? `<span style="cursor:pointer; color:#0084ff;" onclick="startReply('${postId}',${cIdx})">رد</span>` : ''}
-                                    ${isAdmin ? `<span style="cursor:pointer; color:#0084ff;" onclick="editComment('${postId}',${cIdx})">تعديل</span>` : ''}
-                                    ${isAdmin ? `<span style="cursor:pointer; color:red;" onclick="deleteComment('${postId}',${cIdx})">حذف</span>` : ''}
-                                </div>
-                                ${repliesHtml}
+                return `
+                    <div class="comment-item">
+                        <img src="${author.avatar}" class="comment-avatar" onclick="handleAccountClick(${author.id})">
+                        <div class="comment-bubble-container">
+                            <div class="comment-bubble">
+                                <div class="comment-author-name" onclick="handleAccountClick(${author.id})">${author.name} ${getVerifiedBadgeHtml(author)}</div>
+                                <div>${linkify(c.text)}</div>
+                                ${attachmentHtml}
+                                ${c.reaction ? `<span style="position:absolute; bottom:-8px; left:10px; background:#fff; border-radius:10px; padding:2px 4px; font-size:12px; box-shadow:0 1px 3px rgba(0,0,0,0.2);">${c.reaction}</span>` : ''}
                             </div>
+                            <div class="comment-meta">
+                                <span>${getTimeAgo(c.time)}</span>
+                                <span onclick="reactToComment('${postId}', ${cIdx})">أعجبني</span>
+                                <span onclick="startReply('${postId}', ${cIdx})">رد</span>
+                                ${isAdmin ? `<span onclick="editComment('${postId}',${cIdx})">تعديل</span><span onclick="deleteComment('${postId}',${cIdx})" style="color:red;">حذف</span>` : ''}
+                            </div>
+                            ${repliesList.length > 0 ? `
+                                <div style="color:#0084ff; font-weight:700; font-size:13px; margin-top:6px; cursor:pointer;" onclick="toggleReplies('${postId}',${cIdx})">
+                                    ${showReplies ? 'إخفاء الردود' : `عرض ${repliesList.length} ردود`}
+                                </div>
+                            ` : ''}
+                            ${repliesHtml}
                         </div>
-                    `;
-                }).join('');
-
-            if (!isAdmin) {
-                modalFooter.innerHTML = `<div style="text-align: center; color: #65676b; font-size: 13px; font-weight: 600; padding: 4px;">.</div>`;
-            } else {
-                let replyIndicator = currentReplyCommentIndex !== null ? `
-                    <div style="background:#e7f3ff; padding:6px 10px; border-radius:6px; font-size:12px; display:flex; justify-content:space-between; align-items:center;">
-                        <span>جارٍ الرد على التعليق رقم #${currentReplyCommentIndex + 1}</span>
-                        <span style="cursor:pointer; color:red; font-weight:700;" onclick="cancelReply()">✕ إلغاء</span>
-                    </div>
-                ` : '';
-
-                modalFooter.innerHTML = `
-                    ${replyIndicator}
-                    <div id="commentFilePreview" style="font-size:12px; color:green;"></div>
-                    <div style="display:flex; gap:8px; align-items:center;">
-                        <select id="commentAuthorSelect" style="padding:8px; border-radius:6px; border:1px solid #ccc; font-size:13px; font-weight:600;">
-                            ${window.accounts.map(acc => `<option value="${acc.id}">${acc.name}</option>`).join('')}
-                        </select>
-                        <textarea id="commentInputText" placeholder="اكتب تعليقاً..." style="flex:1; padding:8px 12px; border:1px solid #ccc; border-radius:20px; outline:none; resize:none; font-size:14px; max-height:80px;"></textarea>
-                        <i class="fa-solid fa-camera" style="font-size:20px; color:#0084ff; cursor:pointer;" onclick="document.getElementById('commentFilePicker').click()" title="إرفاق صورة أو فيديو"></i>
-                        <button onclick="submitComment('${postId}')" style="background:#0084ff; color:#fff; border:none; padding:8px 14px; border-radius:20px; font-weight:700; cursor:pointer;">إرسال</button>
                     </div>
                 `;
-            }
+            }).join('');
+
+            bodyEl.innerHTML = commentsHtml || `<div style="text-align:center; padding:30px; color:#65676b;">لا توجد تعليقات بعد.</div>`;
+
+            let accountOptions = window.accounts.map(acc => `<option value="${acc.id}">${acc.name}</option>`).join('');
+
+            footerEl.innerHTML = `
+                ${currentReplyCommentIndex !== null ? `<div style="font-size:12px; color:#0084ff; display:flex; justify-content:space-between;"><span>جاري الرد...</span><span style="cursor:pointer; font-weight:700;" onclick="cancelReply()">إلغاء</span></div>` : ''}
+                <div id="commentFilePreview" style="font-size:12px; color:green;"></div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <select id="commentAuthorSelect" style="padding:6px; border-radius:6px; border:1px solid #ccc; font-size:12px;">${accountOptions}</select>
+                    <i class="fa-solid fa-paperclip" style="cursor:pointer; color:#0084ff; font-size:18px;" onclick="document.getElementById('commentFilePicker').click()"></i>
+                    <input type="text" id="commentInputText" placeholder="اكتب تعليقاً..." style="flex:1; padding:8px 12px; border-radius:18px; border:1px solid #ccc; outline:none; font-size:14px;">
+                    <button onclick="submitComment('${postId}')" style="background:#0084ff; color:#fff; border:none; padding:8px 14px; border-radius:18px; font-weight:700; cursor:pointer;">إرسال</button>
+                </div>
+            `;
 
             let modal = document.getElementById('commentsModal');
             if (modal.style.display !== 'flex') {
@@ -1445,42 +1567,35 @@
         }
         window.openComments = openComments;
 
-        function closeCommentsModal() {
-            let el = document.getElementById('commentsModal');
-            if (el && el.style.display === 'flex') window.history.back();
-        }
-        window.closeCommentsModal = closeCommentsModal;
-
         function submitComment(postId) {
-            if (!isAdmin) return;
             let textEl = document.getElementById('commentInputText');
-            let text = textEl ? textEl.value.trim() : "";
-            if (!text && !commentTempFile.url) {
-                alert("يرجى كتابة تعليق أو إرفاق ملف.");
-                return;
-            }
+            let authorSelect = document.getElementById('commentAuthorSelect');
+            let text = textEl.value.trim();
+            let authorId = parseInt(authorSelect.value);
+
+            if (!text && commentTempFile.type === "none") return;
+
             let post = window.posts.find(p => String(p.id) === String(postId));
             if (!post) return;
 
-            let authorId = 1;
-            let authorSelect = document.getElementById('commentAuthorSelect');
-            if (authorSelect) authorId = parseInt(authorSelect.value);
-
             if (currentReplyCommentIndex !== null) {
-                if (!post.comments[currentReplyCommentIndex].replies) post.comments[currentReplyCommentIndex].replies = [];
+                if (!post.comments[currentReplyCommentIndex].replies) {
+                    post.comments[currentReplyCommentIndex].replies = [];
+                }
                 post.comments[currentReplyCommentIndex].replies.push({
                     authorId: authorId,
                     text: text,
-                    time: Date.now(),
-                    reaction: ""
+                    time: Date.now()
                 });
+                visibleRepliesMap[`${postId}_${currentReplyCommentIndex}`] = true;
                 currentReplyCommentIndex = null;
             } else {
+                if (!post.comments) post.comments = [];
                 post.comments.push({
                     authorId: authorId,
                     text: text,
                     time: Date.now(),
-                    attachment: commentTempFile.url ? { ...commentTempFile } : null,
+                    attachment: { ...commentTempFile },
                     reaction: "",
                     replies: []
                 });
@@ -1494,69 +1609,15 @@
         }
         window.submitComment = submitComment;
 
-        function updateCommentsCount(post) {
-            let total = post.comments.length;
-            post.comments.forEach(c => {
-                if (c.replies) total += c.replies.length;
-            });
-            post.commentsCount = total + " تعليقات";
+        function closeCommentsModal() {
+            let el = document.getElementById('commentsModal');
+            if (el && el.style.display === 'flex') window.history.back();
         }
-    </script>
+        window.closeCommentsModal = closeCommentsModal;
 
-    <!-- Firebase SDK Scripts with DOMContentLoaded and onSnapshot -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyDHOX6swPGg0vuDOpl92BG8JAxP7F1o_dM",
-            authDomain: "hadeel2-b47d2.firebaseapp.com",
-            projectId: "hadeel2-b47d2",
-            storageBucket: "hadeel2-b47d2.firebasestorage.app",
-            messagingSenderId: "893297409954",
-            appId: "1:893297409954:web:57fdcca13dd4572d963cfb",
-            measurementId: "G-BKJXH5NPM2"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-
-        window.db = db;
-        window.docRef = doc(db, "siteData", "mainDoc");
-
-        window.saveCloudData = async function() {
-            try {
-                await setDoc(window.docRef, {
-                    accounts: window.accounts,
-                    coverImgUrl: window.coverImgUrl,
-                    bioText: window.bioText,
-                    activeStory: window.activeStory,
-                    posts: window.posts
-                });
-                console.log("تم الحفظ في السحابة بنجاح!");
-            } catch (err) {
-                console.error("خطأ في الحفظ السحابي:", err);
-            }
-        };
-
-        document.addEventListener("DOMContentLoaded", () => {
-            onSnapshot(window.docRef, async (snap) => {
-                if (snap.exists()) {
-                    let data = snap.data();
-                    window.accounts = data.accounts || window.accounts;
-                    window.coverImgUrl = data.coverImgUrl || "";
-                    window.bioText = data.bioText || " .....<br>";
-                    window.activeStory = data.activeStory || { mediaUrl: "", mediaType: "", time: Date.now(), viewers: [] };
-                    window.posts = data.posts || [];
-                } else {
-                    await window.saveCloudData();
-                }
-                if (typeof window.initCloudSyncUI === 'function') {
-                    window.initCloudSyncUI();
-                }
-            }, (error) => {
-                console.error("خطأ في جلب أو الاستماع للتحديثات السحابية:", error);
-            });
+        // تشغيل التطبيق وقراءة البيانات عند التحميل
+        document.addEventListener('DOMContentLoaded', () => {
+            loadDataLocally();
         });
     </script>
 </body>
