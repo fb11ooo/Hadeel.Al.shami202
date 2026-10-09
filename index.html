@@ -321,17 +321,17 @@
 
     <!-- Firebase SDK & Application Logic -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-app.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-firestore.js";
 
         const firebaseConfig = {
-          apiKey: "AIzaSyCYiZT51-dDhh9Cm-BV-sqqiyLWaPb4ysM",
-          authDomain: "ffvh-1d054.firebaseapp.com",
-          projectId: "ffvh-1d054",
-          storageBucket: "ffvh-1d054.firebasestorage.app",
-          messagingSenderId: "245787651793",
-          appId: "1:245787651793:web:4673bbd129271698d9dff0",
-          measurementId: "G-H1JVWKEDGN"
+            apiKey: "AIzaSyAPEIEmu55xzze8ur054_lzRjQqhEskYqc",
+            authDomain: "hadeel009-6aa3c.firebaseapp.com",
+            projectId: "hadeel009-6aa3c",
+            storageBucket: "hadeel009-6aa3c.firebasestorage.app",
+            messagingSenderId: "654125081498",
+            appId: "1:654125081498:web:b2869b6ddb1f3244521023",
+            measurementId: "G-18YZ2NCNWF"
         };
 
         const app = initializeApp(firebaseConfig);
@@ -371,7 +371,7 @@
         window.activeStory = { mediaUrl: "", mediaType: "", time: Date.now(), viewers: [] };
         window.posts = [];
 
-        // دالة حفظ البيانات في سحابة فايربيز بشكل آمن ودائم دون أي فقدان
+        // دالة حفظ البيانات في سحابة فايربيز بشكل آمن ودائم
         window.saveDataFirebase = async function() {
             try {
                 await setDoc(doc(db, "siteData", "mainConfig"), {
@@ -386,7 +386,7 @@
             }
         };
 
-        // دالة جلب البيانات الثابتة من سحابة فايربيز
+        // دالة جلب البيانات من سحابة فايربيز
         window.loadDataFirebase = async function() {
             try {
                 const docSnap = await getDoc(doc(db, "siteData", "mainConfig"));
@@ -1484,7 +1484,7 @@
             let feedEl = document.getElementById('postsFeed');
             if (!feedEl) return;
             if (!window.postsLoaded) {
-                feedEl.innerHTML = `<div style="text-align: center; padding: 30px; color: #65676b; font-weight: 600;">جاري تحميل المنشورات ...</div>`;
+                feedEl.innerHTML = `<div style="text-align: center; padding: 30px; color: #65676b; font-weight: 600;">جاري تحميل المنشورات...</div>`;
                 return;
             }
 
@@ -1556,7 +1556,7 @@
             }).join('');
         }
 
-        // بدء جلب البيانات عند تشغيل الصفحة
+        // بدء تحميل البيانات من فايربيز عند تشغيل الصفحة
         window.loadDataFirebase();
     </script>
 </body>
