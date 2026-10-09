@@ -30,11 +30,9 @@
         .profile-stats-sub { text-align: center; font-size: 14px; color: #65676b; margin-top: 4px; font-weight: 600; }
         .page-category { text-align: center; font-size: 13px; color: #65676b; margin-top: -4px; margin-bottom: 8px; font-weight: 600; }
         
-        /* تم تصغير حجم الشارة الرئيسية في الشاشة الرئيسية بمقدار 1px إضافي (من 17px/16px إلى 16px/15px) */
         .verified-badge { color: #0084ff; font-size: 16px; display: inline-flex; align-items: center; vertical-align: middle; position: relative; }
         .verified-badge svg { width: 15px; height: 15px; }
 
-        /* شارة توثيق أصغر خاصة بالتعليقات والردود */
         .verified-badge-small { color: #0084ff; font-size: 14px; display: inline-flex; align-items: center; vertical-align: middle; position: relative; }
         .verified-badge-small svg { width: 13px; height: 13px; }
 
@@ -563,7 +561,6 @@
             return '';
         }
 
-        /* دالة لإرجاع شارة توثيق أصغر خاصة بالتعليقات والردود */
         window.getSmallVerifiedBadgeHtml = function(accOrId) {
             let acc = null;
             if (typeof accOrId === 'object' && accOrId !== null) acc = accOrId;
@@ -1510,6 +1507,8 @@
                     `;
                 }).join('');
             }
+            
+            // تعديل خانة التعليق لتظهر للزوار ولكن بخاصية readonly بحيث لا تفتح الكيبورد نهائياً وللأدمن تعمل بشكل طبيعي
             if (window.isAdmin) {
                 let replyAlertBox = window.currentReplyCommentIndex !== null ? `
                     <div style="background: #e7f3ff; padding: 6px 10px; border-radius: 6px; font-size: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
@@ -1533,9 +1532,16 @@
                 cAuthorSelect.innerHTML = window.accounts.map(acc => `<option value="${acc.id}">${acc.name} ${acc.isVerified ? '✓' : ''}</option>`).join('');
                 footer.style.display = 'flex';
             } else {
-                footer.innerHTML = '';
-                footer.style.display = 'none';
+                footer.innerHTML = `
+                    <div style="display:flex; gap:8px; align-items:center; width:100%;">
+                        <input type="text" readonly placeholder="اكتب تعليقاً..." style="flex:1; padding:10px 14px; border-radius:20px; border:1px solid #ccd0d5; outline:none; font-size:14px; font-weight:500; background-color:#f0f2f5; cursor:default;">
+                        <i class="fa-solid fa-camera" style="font-size: 20px; color: #b0b3b8; cursor: default;"></i>
+                        <button disabled style="background:#b0b3b8; color:#fff; border:none; padding:8px 16px; border-radius:20px; font-weight:700; font-size:14px; cursor:default;">تعليق</button>
+                    </div>
+                `;
+                footer.style.display = 'flex';
             }
+
             let commentsModalEl = document.getElementById('commentsModal');
             if (commentsModalEl.style.display !== 'flex') {
                 window.history.pushState({ modal: 'commentsModal' }, '');
